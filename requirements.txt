@@ -1,0 +1,26 @@
+# === AI Provider SDKs ===
+google-genai>=1.0.0
+openai>=1.14.0
+anthropic>=0.25.0
+
+# === Retry dan Resilience ===
+tenacity>=8.2.0
+
+# === Token Counting ===
+tiktoken>=0.6.0
+
+# === Markdown dan Templating ===
+markdown>=3.5.0
+jinja2>=3.1.0
+
+# === PDF Conversion ===
+pypandoc>=1.13
+
+# === PDF Validation ===
+pypdf>=4.0.0
+
+# === Environment ===
+python-dotenv>=1.0.0
+
+# === Utilities ===
+requests>=2.31.0
