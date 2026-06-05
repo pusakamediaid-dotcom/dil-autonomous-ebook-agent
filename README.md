@@ -4,7 +4,7 @@ Agent AI berbasis GitHub Actions untuk produksi ebook teknis premium.
 
 ## Deskripsi
 
-DIL Autonomous Ebook Agent adalah sistem yang secara otomatis menghasilkan ebook teknis berkualitas tinggi dari GitHub Issues. Sistem ini dirancang untuk produksi bertahap dan aman.
+DIL Autonomous Ebook Agent adalah sistem yang secara otomatis menghasilkan ebook teknis berkualitas tinggi dari GitHub Issues atau workflow manual.
 
 ## Mode Produksi
 
@@ -13,23 +13,22 @@ DIL Autonomous Ebook Agent adalah sistem yang secara otomatis menghasilkan ebook
 | planning | Hanya membuat task_plan.json dan estimasi biaya | - |
 | test | Membuat 1 bab pendek untuk validasi | - |
 | session | Membuat 3-4 bab untuk satu sesi produksi | Approval jika > 4 bab |
-| full | Ebook penuh | Wajib approval |
 | review | Mengecek output yang sudah ada | - |
 | repair | Memperbaiki output yang gagal | - |
-| html | Konversi Markdown ke HTML | Siap untuk development |
-| pdf | Persiapan konversi PDF | Siap untuk development |
+
+**Mode full belum dibuka untuk umum.**
 
 ## API Providers
 
 Sistem mendukung 5 provider API:
 
-| ID | Provider | SDK Type |
-|----|----------|----------|
-| provider_1 | OpenAI (GPT) | openai |
-| provider_2 | Gemini 1 | google-genai |
-| provider_3 | Gemini 2 | google-genai |
-| provider_4 | Gemini 3 | google-genai |
-| provider_5 | OpenRouter | openai-compatible |
+| ID | Provider | SDK Type | Model Fast | Model Strong |
+|----|----------|----------|------------|--------------|
+| provider_1 | OpenAI (GPT) | openai | gpt-4o-mini | gpt-4o |
+| provider_2 | Gemini 1 | google-genai | gemini-1.5-flash | gemini-1.5-pro |
+| provider_3 | Gemini 2 | google-genai | gemini-1.5-flash | gemini-1.5-pro |
+| provider_4 | Gemini 3 | google-genai | gemini-1.5-flash | gemini-1.5-pro |
+| provider_5 | OpenRouter | openai-compatible | openrouter/auto | openrouter/auto |
 
 **Catatan:** Semua API memiliki kuota dan biaya masing-masing. Tidak ada klaim gratis tanpa limit.
 
@@ -51,32 +50,22 @@ PROVIDER_5_API_KEY=...           # OpenRouter API key
 
 ## Cara Penggunaan
 
-### 1. Buat GitHub Issue
+### Via GitHub Issue
 
-Buat issue baru dengan judul format: `[EBOOK] Judul Ebook`
+1. Buat issue baru dengan format: `[EBOOK] Judul Ebook`
+2. Pilih label `generate-ebook`
+3. Isi form sesuai kebutuhan
+4. Monitor progress di Actions tab
 
-### 2. Isi Form
+### Via Workflow Dispatch
 
-Isi field sesuai kebutuhan:
-- Judul Ebook
-- Target Pembaca
-- Level Pembaca
-- Mode Produksi (pilih: test, session, dll)
-- Jumlah Bab
-- Brief Konten
-- Approval (centang untuk mode besar)
-
-### 3. Tambahkan Label
-
-Tambahkan label `generate-ebook` atau `agent-run` ke issue.
-
-### 4. Monitor Actions
-
-Buka tab Actions untuk melihat progress. Download artifacts saat selesai.
+1. Buka tab Actions
+2. Pilih workflow "DIL Ebook Agent Run"
+3. Klik "Run workflow"
+4. Isi parameter sesuai kebutuhan
+5. Klik "Run workflow"
 
 ## Output Artifacts
-
-Setelah proses selesai, artifacts berikut tersedia:
 
 | File | Deskripsi |
 |------|-----------|
@@ -87,29 +76,77 @@ Setelah proses selesai, artifacts berikut tersedia:
 | cost_report.json | Rincian biaya dan token |
 | review_report.json | Hasil validasi konten |
 | routing_decision.json | Pilihan provider API |
-| memory_context.json | Konteks dari dokumentasi |
+| fallback_info.json | Info jika fallback dipakai |
+
+## Reading Reports
+
+### run_report.json
+
+```json
+{
+  "status": "SUCCESS",
+  "mode": "session",
+  "fallback_info": {
+    "fallback_used": false,
+    "provider_used": "OpenAI",
+    "fallback_reason": ""
+  },
+  "execution": {
+    "agents_executed": ["memory_agent", "task_planner_agent", ...],
+    "agents_failed": []
+  }
+}
+```
+
+### cost_report.json
+
+```json
+{
+  "total_tokens": 5000,
+  "total_cost_usd": 0.025,
+  "provider_breakdown": {
+    "provider_1": {"tokens": 5000, "cost": 0.025, "requests": 3}
+  },
+  "limit_exceeded": false
+}
+```
+
+### review_report.json
+
+```json
+{
+  "status": "PASS",
+  "score": 95,
+  "issues": [],
+  "foreign_text_detected": false,
+  "secret_leak_detected": false
+}
+```
+
+## Mengetahui Fallback
+
+Jika provider tidak tersedia atau API call gagal:
+- File `fallback_info.json` akan menunjukkan `fallback_used: true`
+- Field `fallback_reason` menjelaskan alasan
+- Konten tetap dihasilkan menggunakan template lokal
+
+## Mengetahui Provider yang Dipakai
+
+- Cek `routing_decision.json` untuk melihat provider yang dipilih
+- Cek `run_report.json` field `fallback_info.provider_used`
+- Provider dipilih berdasarkan priority terendah yang tersedia
 
 ## Struktur Repository
 
 ```
 .
 ├── .github/
-│   ├── workflows/
-│   │   └── agent_run.yml
-│   └── ISSUE_TEMPLATE/
-│       └── generate_ebook.yml
+│   ├── workflows/agent_run.yml
+│   └── ISSUE_TEMPLATE/generate_ebook.yml
 ├── config/
 │   ├── model_pool.json
 │   ├── cost_limits.json
-│   ├── agent_roles.json
-│   └── output_rules.json
-├── docs/
-│   ├── PROJECT_BIBLE.md
-│   ├── STYLE_GUIDE.md
-│   ├── TERMINOLOGY_RULES.md
-│   ├── SAFETY_RULES.md
-│   ├── WORKFLOW.md
-│   └── HOW_TO_USE.md
+│   └── ...
 ├── src/
 │   ├── agents/
 │   │   ├── memory_agent.py
@@ -124,18 +161,15 @@ Setelah proses selesai, artifacts berikut tersedia:
 │   │   ├── secret_manager.py
 │   │   ├── run_context.py
 │   │   ├── cost_guard.py
-│   │   ├── report_builder.py
-│   │   ├── task_schema.py
-│   │   └── api_client.py
+│   │   ├── api_client.py
+│   │   └── ...
 │   ├── validators/
 │   │   ├── json_validator.py
 │   │   ├── markdown_validator.py
-│   │   ├── output_validator.py
-│   │   └── safety_validator.py
+│   │   └── ...
 │   └── generator.py
+├── docs/
 ├── memory/
-│   ├── DECISION_LOG.md
-│   └── ERROR_HISTORY.md
 └── requirements.txt
 ```
 
@@ -149,22 +183,35 @@ cd dil-autonomous-ebook-agent
 # Install dependencies
 pip install -r requirements.txt
 
-# Setup environment
-export PROVIDER_1_API_KEY=sk-your-key
-export GITHUB_ISSUE_TITLE="Test Ebook"
+# Set environment variables
+export INPUT_MODE=test
+export INPUT_EBOOK_TITLE="Test Ebook"
+export INPUT_TARGET_AUDIENCE="Pengembang"
+export INPUT_CONTENT_BRIEF="Test brief"
 
 # Run generator
 python src/generator.py
 ```
 
-## Keamanan
+## Troubleshooting
 
-- Semua API key dibaca dari GitHub Secrets
-- Tidak ada API key di kode atau log
-- Logging menggunakan MaskingFilter
-- Validasi konten untuk deteksi secrets
-- Cost guard untuk mencegah budget overrun
+### Provider tidak tersedia
+- Verifikasi GitHub Secrets sudah benar
+- Pastikan nama secret sesuai format
 
-## Lisensi
+### Biaya melebihi budget
+- Cek cost_limits.json untuk limit
+- Gunakan mode test untuk percobaan
+- Kurangi jumlah bab
 
-MIT
+### Output tidak maksimal
+- Cek run_report.json untuk melihat agents yang gagal
+- Cek fallback_info.json jika fallback dipakai
+- Review review_report.json untuk validasi konten
+
+## Batasan
+
+- Tidak ada klaim gratis tanpa limit
+- Semua API memiliki kuota masing-masing
+- Biaya dihitung berdasarkan penggunaan token
+- Mode full memerlukan approval eksplisit

@@ -34,6 +34,31 @@ on:
         required: false
         type: string
         default: '1'
+      target_pages:
+        description: 'Target pages (optional)'
+        required: false
+        type: string
+        default: ''
+      session_number:
+        description: 'Session number (1-4)'
+        required: false
+        type: string
+        default: ''
+      content_brief:
+        description: 'Content brief'
+        required: false
+        type: string
+        default: ''
+      special_instructions:
+        description: 'Special instructions'
+        required: false
+        type: string
+        default: ''
+      api_preference:
+        description: 'API provider preference'
+        required: false
+        type: string
+        default: 'auto'
       approval:
         description: 'Approval given'
         required: false
@@ -93,10 +118,26 @@ jobs:
         run: |
           python src/generator.py
         env:
+          # GitHub context
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_ISSUE_NUMBER: ${{ github.event.issue.number || '' }}
           GITHUB_ISSUE_TITLE: ${{ github.event.issue.title || inputs.ebook_title || '' }}
           GITHUB_ISSUE_BODY: ${{ github.event.issue.body || '' }}
+          
+          # Workflow dispatch inputs
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_EBOOK_TITLE: ${{ inputs.ebook_title || '' }}
+          INPUT_TARGET_AUDIENCE: ${{ inputs.target_audience || '' }}
+          INPUT_READING_LEVEL: ${{ inputs.reading_level || 'intermediate' }}
+          INPUT_TOTAL_CHAPTERS: ${{ inputs.total_chapters || '1' }}
+          INPUT_TARGET_PAGES: ${{ inputs.target_pages || '' }}
+          INPUT_SESSION_NUMBER: ${{ inputs.session_number || '' }}
+          INPUT_CONTENT_BRIEF: ${{ inputs.content_brief || '' }}
+          INPUT_SPECIAL_INSTRUCTIONS: ${{ inputs.special_instructions || '' }}
+          INPUT_API_PREFERENCE: ${{ inputs.api_preference || 'auto' }}
+          INPUT_APPROVAL: ${{ inputs.approval && 'true' || 'false' }}
+          
+          # API Keys from Secrets
           PROVIDER_1_API_KEY: ${{ secrets.PROVIDER_1_API_KEY }}
           PROVIDER_2_API_KEY: ${{ secrets.PROVIDER_2_API_KEY }}
           PROVIDER_3_API_KEY: ${{ secrets.PROVIDER_3_API_KEY }}
@@ -106,7 +147,11 @@ jobs:
       - name: Display output files
         run: |
           echo "=== Generated Output Files ==="
-          find output -type f 2>/dev/null | head -20 || echo "No output files found"
+          if [ -d output ]; then
+            find output -type f -name "*.md" -o -name "*.json" -o -name "*.txt" 2>/dev/null | head -20
+          else
+            echo "No output directory found"
+          fi
       
       - name: Upload all artifacts
         uses: actions/upload-artifact@v4
@@ -129,13 +174,30 @@ jobs:
             FAILED=$(python3 -c "import json; r=json.load(open('output/run_report.json')); print(len(r.get('execution', {}).get('agents_failed', [])))")
             COST=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('summary', {}).get('total_cost_usd', 0))")
             
+            # Check fallback info
+            FALLBACK_USED="false"
+            FALLBACK_REASON=""
+            if [ -f output/fallback_info.json ]; then
+              FALLBACK_USED=$(python3 -c "import json; print(json.load(open('output/fallback_info.json')).get('fallback_used', 'false'))")
+              FALLBACK_REASON=$(python3 -c "import json; print(json.load(open('output/fallback_info.json')).get('fallback_reason', ''))")
+            fi
+            
             COMMENT="Ebook generation completed.
 
 Status: ${STATUS}
 Mode: ${MODE}
 Agents executed: ${AGENTS}
 Agents failed: ${FAILED}
-Total cost: $${COST}
+Total cost: $${COST}"
+
+if [ "${FALLBACK_USED}" = "True" ]; then
+  COMMENT="${COMMENT}
+
+Fallback used: Yes
+Reason: ${FALLBACK_REASON}"
+fi
+
+COMMENT="${COMMENT}
 
 Artifacts available in Actions run."
           else

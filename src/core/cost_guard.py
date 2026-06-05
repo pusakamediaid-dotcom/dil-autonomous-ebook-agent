@@ -1,43 +1,32 @@
 """
-DIL Autonomous Ebook Agent - Cost Guard Module (MVP)
+DIL Autonomous Ebook Agent - Cost Guard Module
 
-Simple token estimation and cost tracking to prevent budget overruns.
+Track dan limit token usage serta biaya untuk mencegah budget overrun.
 """
 
 import json
-import os
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List, Optional
 
 from .logger import get_logger
 
 logger = get_logger(__name__)
 
 
-# Default cost per 1K tokens if config not available
-DEFAULT_COSTS = {
-    "gpt-4o": 0.005,
-    "gpt-4o-mini": 0.00015,
-    "gpt-4-turbo": 0.01,
-    "gpt-3.5-turbo": 0.0005,
-    "claude-3-5-sonnet": 0.003,
-    "claude-3-opus": 0.015,
-    "default": 0.001
-}
-
-
 class CostGuard:
     """
-    MVP cost guard for tracking and estimating token usage.
+    Cost guard untuk tracking dan estimating token usage.
+    Mencegah budget overrun dengan pre-check sebelum API calls.
     """
     
     def __init__(self, config_dir: str = "config"):
         """
-        Initialize CostGuard.
+        Inisialisasi CostGuard.
         
         Args:
-            config_dir: Path to config directory.
+            config_dir: Path ke direktori config.
         """
+        from pathlib import Path
+        
         self.config_dir = Path(config_dir)
         self.cost_limits_path = self.config_dir / "cost_limits.json"
         self.model_pool_path = self.config_dir / "model_pool.json"
@@ -47,27 +36,29 @@ class CostGuard:
         
         self.total_tokens = 0
         self.total_cost = 0.0
-        self.requests = []
+        self.requests: List[Dict[str, Any]] = []
+        self.provider_costs: Dict[str, Dict[str, Any]] = {}
+        self.limit_exceeded = False
         
         # Default limits
-        self.max_tokens_per_run = self.cost_limits.get("max_tokens_per_run", 100000)
-        self.max_cost_per_run = self.cost_limits.get("max_cost_per_run", 0.50)
+        self.max_tokens_per_run = self.cost_limits.get("limits", {}).get("max_tokens_per_run", 100000)
+        self.max_cost_per_run = self.cost_limits.get("limits", {}).get("max_cost_per_run", 0.50)
     
     def _load_cost_limits(self) -> Dict[str, Any]:
-        """Load cost limits from config."""
+        """Load cost limits dari config."""
         try:
             if self.cost_limits_path.exists():
                 with open(self.cost_limits_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    logger.debug(f"Loaded cost limits from {self.cost_limits_path}")
+                    logger.debug(f"Loaded cost limits dari {self.cost_limits_path}")
                     return data
         except Exception as e:
             logger.warning(f"Could not load cost limits: {e}")
         return {}
     
     def _load_model_prices(self) -> Dict[str, float]:
-        """Load model prices from model pool config."""
-        prices = DEFAULT_COSTS.copy()
+        """Load model prices dari model pool config."""
+        prices = {}
         
         try:
             if self.model_pool_path.exists():
@@ -80,7 +71,7 @@ class CostGuard:
                             model_id = model.get("id", "")
                             cost_input = model.get("cost_input_per_1k", 0)
                             
-                            if model_id and cost_input:
+                            if model_id and cost_input is not None:
                                 prices[model_id] = float(cost_input)
         except Exception as e:
             logger.warning(f"Could not load model prices: {e}")
@@ -89,10 +80,7 @@ class CostGuard:
     
     def estimate_tokens(self, text: str) -> int:
         """
-        Simple token estimation based on word count.
-        
-        Rough estimate: 1 token ≈ 4 characters for English,
-        or ~0.75 words for typical prose.
+        Estimate tokens dari text.
         
         Args:
             text: Input text string.
@@ -103,27 +91,15 @@ class CostGuard:
         if not text:
             return 0
         
-        # Simple heuristic: ~4 characters per token
+        # Rough estimate: ~4 characters per token
         char_count = len(text)
         estimated = int(char_count / 4)
         
-        return max(estimated, 10)  # Minimum 10 tokens
-    
-    def estimate_tokens_from_words(self, word_count: int) -> int:
-        """
-        Estimate tokens from word count.
-        
-        Args:
-            word_count: Number of words.
-        
-        Returns:
-            Estimated token count.
-        """
-        return int(word_count * 1.33)  # ~1.33 tokens per word
+        return max(estimated, 10)
     
     def get_cost_per_1k(self, model_id: str) -> float:
         """
-        Get cost per 1K tokens for a model.
+        Get cost per 1K tokens untuk model.
         
         Args:
             model_id: Model identifier.
@@ -131,91 +107,106 @@ class CostGuard:
         Returns:
             Cost per 1K tokens.
         """
-        return self.model_prices.get(model_id, self.model_prices.get("default", 0.001))
+        return self.model_prices.get(model_id, 0.001)
     
-    def estimate_cost(self, tokens: int, provider_id: str, model_type: str) -> float:
+    def estimate_cost(self, tokens: int, provider_id: str, model_id: str) -> float:
         """
-        Estimate cost for a given token count.
+        Estimate cost untuk token count.
         
         Args:
             tokens: Number of tokens.
             provider_id: Provider identifier.
-            model_type: Model type/identifier.
+            model_id: Model type/identifier.
         
         Returns:
             Estimated cost in USD.
         """
-        cost_per_1k = self.get_cost_per_1k(model_type)
+        cost_per_1k = self.get_cost_per_1k(model_id)
         cost = (tokens / 1000) * cost_per_1k
         
-        logger.debug(f"Cost estimate: {tokens} tokens × ${cost_per_1k}/1K = ${cost:.6f}")
-        
         return round(cost, 6)
+    
+    def check_limit(self, tokens: int, cost: float) -> tuple[bool, str]:
+        """
+        Check apakah request akan melebihi limit.
+        
+        Args:
+            tokens: Tokens untuk request.
+            cost: Cost untuk request.
+        
+        Returns:
+            Tuple (allowed, reason).
+        """
+        new_total_tokens = self.total_tokens + tokens
+        new_total_cost = self.total_cost + cost
+        
+        if new_total_tokens > self.max_tokens_per_run:
+            return False, f"Token limit exceeded: {new_total_tokens} > {self.max_tokens_per_run}"
+        
+        if new_total_cost > self.max_cost_per_run:
+            return False, f"Cost limit exceeded: ${new_total_cost:.4f} > ${self.max_cost_per_run:.4f}"
+        
+        return True, "OK"
     
     def check_and_register(
         self,
         prompt: str,
         provider_id: str,
-        model_type: str,
+        model_id: str,
         agent_name: str
     ) -> Dict[str, Any]:
         """
-        Check if request is within budget and register it.
+        Check jika request within budget dan register.
         
         Args:
-            prompt: Prompt text to process.
+            prompt: Prompt text untuk diproses.
             provider_id: Provider identifier.
-            model_type: Model type/identifier.
-            agent_name: Name of agent making the request.
+            model_id: Model type/identifier.
+            agent_name: Nama agent membuat request.
         
         Returns:
-            Dict with 'allowed' boolean and 'reason' if not allowed.
+            Dict dengan 'allowed' boolean dan details.
         """
-        # Estimate tokens for prompt
         estimated_tokens = self.estimate_tokens(prompt)
+        estimated_cost = self.estimate_cost(estimated_tokens, provider_id, model_id)
         
-        # Estimate cost
-        estimated_cost = self.estimate_cost(estimated_tokens, provider_id, model_type)
+        # Check limit
+        allowed, reason = self.check_limit(estimated_tokens, estimated_cost)
         
-        # Check limits
-        new_total_tokens = self.total_tokens + estimated_tokens
-        new_total_cost = self.total_cost + estimated_cost
-        
-        # Check token limit
-        if new_total_tokens > self.max_tokens_per_run:
-            logger.warning(
-                f"Token limit exceeded: {new_total_tokens} > {self.max_tokens_per_run}"
-            )
+        if not allowed:
+            logger.warning(f"Request denied: {reason}")
+            self.limit_exceeded = True
             return {
                 "allowed": False,
-                "reason": f"Token limit exceeded ({new_total_tokens} > {self.max_tokens_per_run})"
+                "reason": reason,
+                "tokens": estimated_tokens,
+                "cost": estimated_cost
             }
         
-        # Check cost limit
-        if new_total_cost > self.max_cost_per_run:
-            logger.warning(
-                f"Cost limit exceeded: ${new_total_cost:.4f} > ${self.max_cost_per_run:.4f}"
-            )
-            return {
-                "allowed": False,
-                "reason": f"Cost limit exceeded (${new_total_cost:.4f} > ${self.max_cost_per_run:.4f})"
-            }
-        
-        # Register the request
+        # Register request
         self.total_tokens += estimated_tokens
         self.total_cost += estimated_cost
         
-        self.requests.append({
+        request = {
             "agent": agent_name,
             "provider": provider_id,
-            "model": model_type,
+            "model": model_id,
             "tokens": estimated_tokens,
-            "cost": estimated_cost
-        })
+            "cost": estimated_cost,
+            "prompt_length": len(prompt)
+        }
         
-        logger.info(
-            f"Request registered: {agent_name} - {estimated_tokens} tokens, ${estimated_cost:.6f}"
-        )
+        self.requests.append(request)
+        
+        # Track per provider
+        if provider_id not in self.provider_costs:
+            self.provider_costs[provider_id] = {"tokens": 0, "cost": 0.0, "requests": 0}
+        
+        self.provider_costs[provider_id]["tokens"] += estimated_tokens
+        self.provider_costs[provider_id]["cost"] += estimated_cost
+        self.provider_costs[provider_id]["requests"] += 1
+        
+        logger.info(f"Request registered: {agent_name} via {provider_id} - {estimated_tokens} tokens, ${estimated_cost:.6f}")
         
         return {
             "allowed": True,
@@ -223,38 +214,74 @@ class CostGuard:
             "cost": estimated_cost
         }
     
+    def add_actual_cost(self, tokens: int, cost: float, provider_id: str, agent_name: str) -> None:
+        """
+        Add actual cost setelah API call.
+        
+        Args:
+            tokens: Actual tokens used.
+            cost: Actual cost in USD.
+            provider_id: Provider ID.
+            agent_name: Agent name.
+        """
+        self.total_tokens += tokens
+        self.total_cost += cost
+        
+        request = {
+            "agent": agent_name,
+            "provider": provider_id,
+            "model": "unknown",
+            "tokens": tokens,
+            "cost": cost,
+            "prompt_length": 0,
+            "actual": True
+        }
+        
+        self.requests.append(request)
+        
+        if provider_id not in self.provider_costs:
+            self.provider_costs[provider_id] = {"tokens": 0, "cost": 0.0, "requests": 0}
+        
+        self.provider_costs[provider_id]["tokens"] += tokens
+        self.provider_costs[provider_id]["cost"] += cost
+        self.provider_costs[provider_id]["requests"] += 1
+    
     def get_report(self) -> Dict[str, Any]:
         """
         Get cost report.
         
         Returns:
-            Dictionary with cost statistics.
+            Dictionary dengan cost statistics.
         """
         return {
             "total_tokens": self.total_tokens,
             "total_cost_usd": round(self.total_cost, 6),
-            "max_tokens_limit": self.max_tokens_per_run,
-            "max_cost_limit": self.max_cost_per_run,
+            "limits": {
+                "max_tokens_per_run": self.max_tokens_per_run,
+                "max_cost_per_run": self.max_cost_per_run
+            },
+            "remaining": {
+                "tokens_remaining": self.max_tokens_per_run - self.total_tokens,
+                "cost_remaining": round(self.max_cost_per_run - self.total_cost, 6)
+            },
+            "utilization": {
+                "token_usage_percent": round(
+                    (self.total_tokens / self.max_tokens_per_run) * 100,
+                    2
+                ) if self.max_tokens_per_run > 0 else 0,
+                "cost_usage_percent": round(
+                    (self.total_cost / self.max_cost_per_run) * 100,
+                    2
+                ) if self.max_cost_per_run > 0 else 0
+            },
+            "provider_breakdown": self.provider_costs,
             "requests": self.requests,
-            "tokens_remaining": self.max_tokens_per_run - self.total_tokens,
-            "cost_remaining": round(self.max_cost_per_run - self.total_cost, 6)
+            "limit_exceeded": self.limit_exceeded
         }
-    
-    def add_actual_cost(self, tokens: int, cost: float) -> None:
-        """
-        Add actual cost after API call (for more accurate tracking).
-        
-        Args:
-            tokens: Actual tokens used.
-            cost: Actual cost in USD.
-        """
-        self.total_tokens += tokens
-        self.total_cost += cost
-        logger.debug(f"Added actual cost: {tokens} tokens, ${cost:.6f}")
 
 
 def get_cost_guard() -> CostGuard:
-    """Get or create global CostGuard instance."""
+    """Get atau create global CostGuard instance."""
     global _global_cost_guard
     if '_global_cost_guard' not in globals():
         _global_cost_guard = CostGuard()

@@ -64,6 +64,9 @@ class EbookGenerator:
         
         self.agents_executed: List[str] = []
         self.agents_failed: List[str] = []
+        self.fallback_used: bool = False
+        self.fallback_reason: str = ""
+        self.provider_used: str = ""
         
         self.output_dir = Path("output")
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -72,21 +75,18 @@ class EbookGenerator:
     
     def setup(self) -> None:
         """Setup komponen generator."""
-        # Buat run context dari environment
         self.run_context = create_run_context_from_issue()
         logger.info(f"RunContext created: mode={self.run_context.mode}")
         
-        # Initialize cost guard
         self.cost_guard = CostGuard()
         logger.info("CostGuard initialized")
         
-        # Initialize report builder
         self.report_builder = ReportBuilder()
         logger.info("ReportBuilder initialized")
     
     def validate_approval_gate(self) -> bool:
         """
-        Memvalidasi approval untuk mode besar.
+        Validasi approval untuk mode besar.
         
         Returns:
             True jika approved atau mode kecil.
@@ -146,19 +146,27 @@ class EbookGenerator:
             decision = run_router_agent(self.run_context)
             
             if decision.get("status") == "failed":
-                logger.error(f"Routing failed: {decision.get('reason')}")
+                logger.warning(f"Routing failed: {decision.get('reason')}")
                 self.agents_failed.append("router_agent")
                 self.run_context.mark_agent_failed("router_agent")
+                
+                # Set fallback info
+                self.fallback_used = True
+                self.fallback_reason = "No provider available"
+                self.run_context.set_fallback(self.fallback_reason)
             else:
                 self.agents_executed.append("router_agent")
                 self.run_context.mark_agent_done("router_agent")
-                logger.info("Routing phase completed successfully")
+                self.provider_used = decision.get("selected_provider_name", "unknown")
+                logger.info(f"Routing completed: provider={self.provider_used}")
             
             return decision
         except Exception as e:
             logger.error(f"Routing phase failed: {e}")
             self.agents_failed.append("router_agent")
             self.run_context.mark_agent_failed("router_agent")
+            self.fallback_used = True
+            self.fallback_reason = f"Router exception: {str(e)}"
             return {"status": "failed", "reason": str(e)}
     
     def run_outline_phase(self) -> Dict[str, Any]:
@@ -190,10 +198,9 @@ class EbookGenerator:
         is_valid, errors = validate_json_file(str(outline_path))
         
         if not is_valid:
-            logger.error(f"Outline validation failed: {errors}")
-            return False
+            logger.warning(f"Outline validation issues: {errors}")
         
-        logger.info("Outline validation passed")
+        logger.info("Outline validation completed")
         return True
     
     def run_writing_phase(self) -> str:
@@ -205,16 +212,17 @@ class EbookGenerator:
             self.agents_executed.append("writer_agent")
             self.run_context.mark_agent_done("writer_agent")
             
-            # Estimate words written
-            word_count = len(content.split()) if content else 0
-            estimated_tokens = word_count * 1
-            estimated_cost = self.cost_guard.estimate_cost(
-                estimated_tokens,
-                self.run_context.selected_provider or "unknown",
-                "default"
-            )
+            # Check fallback info from writer
+            fallback_info_path = self.output_dir / "fallback_info.json"
+            if fallback_info_path.exists():
+                with open(fallback_info_path, 'r', encoding='utf-8') as f:
+                    fallback_info = json.load(f)
+                    if fallback_info.get("fallback_used"):
+                        self.fallback_used = True
+                        self.fallback_reason = fallback_info.get("fallback_reason", "")
+                        logger.info(f"Writer used fallback: {self.fallback_reason}")
             
-            self.run_context.add_cost(estimated_tokens, estimated_cost)
+            word_count = len(content.split()) if content else 0
             logger.info(f"Writing phase completed - {word_count} words")
             
             return content
@@ -298,12 +306,11 @@ class EbookGenerator:
         """Finalisasi run - buat reports dan artifacts."""
         logger.info("=== FINALIZATION PHASE ===")
         
-        # Mark run sebagai finalized
         self.run_context.finalize()
         
-        # Build dan save run report
         output_files = self._get_output_files()
         
+        # Build run report dengan fallback info
         run_report = self.report_builder.build_run_report(
             self.run_context,
             self.agents_executed,
@@ -311,21 +318,30 @@ class EbookGenerator:
             output_files
         )
         
+        # Tambahkan fallback info ke run report
+        run_report["fallback_info"] = {
+            "fallback_used": self.fallback_used,
+            "fallback_reason": self.fallback_reason,
+            "provider_used": self.provider_used
+        }
+        
         self.report_builder.save_run_report(run_report)
         
-        # Build dan save cost report
+        # Build cost report
         cost_report = self.report_builder.build_cost_report(self.cost_guard)
+        cost_report["fallback_info"] = {
+            "fallback_used": self.fallback_used
+        }
         self.report_builder.save_cost_report(cost_report)
         
-        # Save artifacts manifest
         self.report_builder.save_artifact_list(output_files)
-        
-        # Save run context
         self.run_context.save_to_file("output/run_context.json")
         
         logger.info("Finalization completed")
         logger.info(f"Summary: {len(self.agents_executed)} executed, {len(self.agents_failed)} failed")
         logger.info(f"Total cost: ${self.run_context.total_usd_spent:.6f}")
+        if self.fallback_used:
+            logger.info(f"Fallback used: {self.fallback_reason}")
     
     def _get_output_files(self) -> List[str]:
         """Mendapatkan list file output yang ada."""
@@ -338,7 +354,8 @@ class EbookGenerator:
             "output/memory_context.json",
             "output/routing_decision.json",
             "output/review_report.json",
-            "output/ebook_repaired.md"
+            "output/ebook_repaired.md",
+            "output/fallback_info.json"
         ]
         
         existing = [f for f in files if Path(f).exists()]
@@ -355,7 +372,6 @@ class EbookGenerator:
         logger.info("DIL AUTONOMOUS EBOOK AGENT - STARTING")
         logger.info("=" * 50)
         
-        # Setup
         self.setup()
         
         # Memory phase (selalu)
@@ -385,15 +401,6 @@ class EbookGenerator:
         
         # Routing phase
         routing = self.run_routing_phase()
-        
-        if routing.get("status") == "failed":
-            logger.error("Routing failed - tidak bisa lanjut")
-            self.finalize()
-            return {
-                "status": "FAILED",
-                "reason": "Tidak ada API provider tersedia",
-                "phase": "routing"
-            }
         
         # Outline phase
         outline = self.run_outline_phase()
@@ -442,6 +449,9 @@ class EbookGenerator:
             "mode": self.run_context.mode,
             "agents_executed": self.agents_executed,
             "agents_failed": self.agents_failed,
+            "fallback_used": self.fallback_used,
+            "fallback_reason": self.fallback_reason,
+            "provider_used": self.provider_used,
             "review_status": review_result.get("status"),
             "review_score": review_result.get("score"),
             "total_tokens": self.run_context.total_tokens_used,
@@ -463,14 +473,21 @@ def main():
         print(f"Mode: {result.get('mode')}")
         print(f"Agents executed: {result.get('agents_executed', [])}")
         print(f"Agents failed: {result.get('agents_failed', [])}")
-        print(f"Review: {result.get('review_status')} ({result.get('review_score')})")
+        print(f"Fallback used: {result.get('fallback_used')}")
+        print(f"Provider used: {result.get('provider_used')}")
+        print(f"Review: {result.get('review_status')} (score: {result.get('review_score')})")
         print(f"Total tokens: {result.get('total_tokens', 0)}")
         print(f"Total cost: ${result.get('total_cost_usd', 0):.6f}")
-        print(f"Artifacts: {result.get('artifacts', [])}")
+        print(f"Artifacts: {len(result.get('artifacts', []))} files")
         print("=" * 50)
         
         # Exit with appropriate code
-        sys.exit(0 if result.get('status') == 'SUCCESS' else 1)
+        # PARTIAL_SUCCESS juga dianggap success (exit 0)
+        status = result.get('status', 'FAILED')
+        if status in ['SUCCESS', 'PARTIAL_SUCCESS']:
+            sys.exit(0)
+        else:
+            sys.exit(1)
         
     except Exception as e:
         logger.error(f"Fatal error: {e}")

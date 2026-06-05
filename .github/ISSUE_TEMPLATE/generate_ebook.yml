@@ -9,16 +9,22 @@ body:
         ## Ebook Generation Request
         
         Isi formulir di bawah ini untuk memulai proses pembuatan ebook.
-        Mode yang tersedia: planning, test, session, full, review, repair, html, pdf.
         
-        Label agent-run atau generate-ebook akan memicu GitHub Actions.
+        Mode tersedia:
+        - planning: Hanya membuat rencana dan estimasi biaya
+        - test: Membuat 1 bab pendek untuk validasi
+        - session: Membuat 3-4 bab untuk satu sesi produksi
+        - review: Mengecek output yang sudah ada
+        - repair: Memperbaiki output yang gagal
+        
+        Mode full belum dibuka untuk umum.
 
   - type: input
     id: ebook_title
     attributes:
       label: Judul Ebook
       description: Judul buku elektronik yang ingin dibuat
-      placeholder: "Contoh: Pengenalan Machine Learning untuk Pemula"
+      placeholder: "Contoh: Panduan Dasar AI untuk Membuat Ebook Premium"
     validations:
       required: true
 
@@ -27,7 +33,7 @@ body:
     attributes:
       label: Target Pembaca
       description: Siapa target pembaca ebook ini
-      placeholder: "Contoh: Developer Python tingkat menengah"
+      placeholder: "Contoh: Pemula, penjual produk digital, kreator ebook, pelajar, mahasiswa"
     validations:
       required: true
 
@@ -52,11 +58,8 @@ body:
         - planning
         - test
         - session
-        - full
         - review
         - repair
-        - html
-        - pdf
     validations:
       required: true
 
@@ -98,10 +101,9 @@ body:
         Jelaskan topik utama, scope, dan fokus ebook.
         
         Contoh:
-        Ebook ini mencakup dasar-dasar machine learning:
-        - Konsep supervised vs unsupervised learning
-        - Algoritma regresi dan klasifikasi
-        - Praktik kode dengan Python dan scikit-learn
+        Ebook ini mengajarkan cara memahami AI sebagai alat bantu produksi ebook digital.
+        Fokus pada alur kerja dari ide, riset, outline, penulisan, review, hingga persiapan file jualan.
+        Bahasa harus mudah dipahami pemula dan praktis.
     validations:
       required: true
 
@@ -112,9 +114,10 @@ body:
       description: Instruksi khusus atau preferensi konten (opsional)
       placeholder: |
         Contoh:
-        - Fokus pada contoh kode praktis
-        - Hindari jargon teknis yang terlalu kompleks
-        - Sertakan diagram jika memungkinkan
+        - Gunakan Bahasa Indonesia rapi
+        - Hindari teori terlalu panjang
+        - Berikan contoh nyata
+        - Setiap subbab wajib punya Metode 5-Lapis
 
   - type: dropdown
     id: api_preference
@@ -130,13 +133,6 @@ body:
         - provider_5
     validations:
       required: false
-
-  - type: confirm
-    id: pdf_required
-    attributes:
-      label: PDF diperlukan
-      description: Centang jika output perlu dikonversi ke PDF
-      value: false
 
   - type: confirm
     id: approval_given
@@ -157,12 +153,12 @@ body:
         - [ ] Level pembaca sesuai dengan konten
         - [ ] Brief konten cukup detail
         - [ ] Mode yang dipilih sudah tepat
-        - [ ] Approval sudah diberikan untuk mode besar
+        - [ ] Approval sudah diberikan
         
         ## Catatan Penting
         
-        - Mode test: 1 bab pendek untuk validasi
+        - Mode test: 1 bab pendek untuk validasi (biaya minimal)
         - Mode session: 3-4 bab untuk satu sesi produksi
-        - Mode full: Memerlukan approval eksplisit
+        - Mode full: Belum dibuka untuk umum
         - Semua API memiliki kuota dan biaya masing-masing
         - Tidak ada klaim gratis tanpa limit

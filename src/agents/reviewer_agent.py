@@ -57,15 +57,21 @@ class ReviewerAgent:
         """Memeriksa apakah semua bab ada."""
         issues = []
         chapters = outline.get("chapters", [])
+        mode = outline.get("mode", "test")
         
         for chapter in chapters:
             chapter_num = chapter.get("chapter_number", 0)
-            chapter_title = chapter.get("chapter_title", "")
             
             # Cek apakah bab ada di konten
             pattern = rf"Bab\s+{chapter_num}\s*[-—]"
             if not re.search(pattern, content, re.IGNORECASE):
                 issues.append(f"Bab {chapter_num} tidak ditemukan di konten")
+        
+        # Check minimal chapters based on mode
+        if mode == "test" and len(chapters) < 1:
+            issues.append("Mode test minimal harus ada 1 bab")
+        elif mode == "session" and len(chapters) < 3:
+            issues.append("Mode session minimal harus ada 3 bab")
         
         return issues
     
@@ -74,7 +80,6 @@ class ReviewerAgent:
         issues = []
         required_layers = ["[KONSEP]", "[ANALOGI]", "[RUMUS]", "[CONTOH]", "[APLIKASI]"]
         
-        # Cek setiap lapisan
         for layer in required_layers:
             count = content.count(layer)
             if count == 0:
@@ -83,12 +88,7 @@ class ReviewerAgent:
         return issues
     
     def check_foreign_text(self, content: str) -> tuple[bool, List[str]]:
-        """
-        Memeriksa apakah ada teks asing/campur bahasa.
-        
-        Returns:
-            Tuple (detected, list of detected patterns).
-        """
+        """Memeriksa apakah ada teks asing/campur bahasa."""
         detected = []
         foreign_patterns = [
             (r'[\u4e00-\u9fff]', 'Mandarin/CJK'),
@@ -109,7 +109,6 @@ class ReviewerAgent:
         """Memeriksa apakah ada API key atau secret bocor."""
         issues = []
         
-        # Pattern untuk API keys
         secret_patterns = [
             r'sk-[a-zA-Z0-9]{20,}',
             r'ghp_[a-zA-Z0-9]{36,}',
@@ -120,7 +119,7 @@ class ReviewerAgent:
         for pattern in secret_patterns:
             matches = re.findall(pattern, content)
             if matches:
-                issues.append(f"Potential secret detected (pattern tersembunyi)")
+                issues.append("Potential secret detected")
         
         return issues
     
@@ -129,10 +128,9 @@ class ReviewerAgent:
         issues = []
         lines = content.split('\n')
         
-        last_heading_level = 0
+        last_level = 0
         for i, line in enumerate(lines, 1):
             if line.startswith('#'):
-                # Tentukan level heading
                 level = 0
                 for c in line:
                     if c == '#':
@@ -140,20 +138,19 @@ class ReviewerAgent:
                     else:
                         break
                 
-                # Heading level harus naik berurutan (tidak boleh loncat)
-                # Dari # ke ### langsung tidak diperbolehkan
-                if level > last_heading_level + 1 and last_heading_level > 0:
-                    issues.append(f"Line {i}: Heading melompat dari level {last_heading_level} ke {level}")
+                if last_level > 0 and level > last_level + 1:
+                    issues.append(f"Line {i}: Heading melompat dari H{last_level} ke H{level}")
                 
-                last_heading_level = level
+                last_level = level
         
         return issues
     
-    def check_content_length(self, content: str, min_words: int = 100) -> List[str]:
+    def check_content_length(self, content: str, mode: str = "test") -> List[str]:
         """Memeriksa apakah konten tidak terlalu pendek."""
         issues = []
-        
         word_count = len(content.split())
+        
+        min_words = 500 if mode == "test" else 2000
         
         if word_count < min_words:
             issues.append(f"Konten terlalu pendek: {word_count} kata (minimal: {min_words})")
@@ -168,8 +165,7 @@ class ReviewerAgent:
             (r'lorem\s+ipsum', 'Lorem ipsum terdeteksi'),
             (r'todo', 'TODO terdeteksi'),
             (r'fixme', 'FIXME terdeteksi'),
-            (r'placeholder', 'Placeholder terdeteksi'),
-            (r'\[.*placeholder.*\]', 'Placeholder dalam kurung siku')
+            (r'placeholder', 'Placeholder terdeteksi')
         ]
         
         for pattern, message in placeholder_patterns:
@@ -178,52 +174,74 @@ class ReviewerAgent:
         
         return issues
     
-    def calculate_score(self, issues: List[str], total_checks: int = 7) -> float:
-        """
-        Menghitung score review (0-100).
+    def check_toc_and_summary(self, content: str) -> List[str]:
+        """Memeriksa apakah ada daftar isi dan ringkasan."""
+        issues = []
         
-        Args:
-            issues: List issue yang ditemukan.
-            total_checks: Total jumlah pemeriksaan.
+        if not re.search(r'#\s*Daftar\s+Isi', content, re.IGNORECASE):
+            issues.append("Daftar isi tidak ditemukan")
         
-        Returns:
-            Score 0-100.
+        if not re.search(r'#\s*Ringkasan', content, re.IGNORECASE):
+            issues.append("Ringkasan tidak ditemukan")
+        
+        return issues
+    
+    def check_language_mix(self, content: str) -> float:
         """
-        if total_checks == 0:
+        Check tingkat campur bahasa Inggris.
+        Returns score 0-100 (100 = semua Indonesia).
+        """
+        lines = content.split('\n')
+        
+        # Count English-heavy sentences
+        english_count = 0
+        total_sentences = 0
+        
+        for line in lines:
+            if line.strip() and len(line.strip()) > 20:
+                total_sentences += 1
+                # Simple heuristic: if line has many English words
+                english_words = len(re.findall(r'\b[a-zA-Z]{5,}\b', line))
+                if english_words > 5:
+                    english_count += 1
+        
+        if total_sentences == 0:
+            return 80  # Default score
+        
+        mix_ratio = english_count / total_sentences
+        score = 100 - (mix_ratio * 50)  # Max penalty 50 points
+        
+        return max(0, min(100, score))
+    
+    def calculate_score(self, issues: List[str]) -> float:
+        """Menghitung score review (0-100)."""
+        if not issues:
             return 100.0
         
         base_score = 100.0
         
-        # Pengurangan per issue
-        deductions = {
-            'secret_leak': 50,      # Major security issue
-            'foreign_text': 20,     # Quality issue
-            'missing_layers': 15,   # Structure issue
-            'heading_error': 10,    # Format issue
-            'content_short': 10,    # Quality issue
-            'placeholder': 5,       # Minor issue
-            'chapter_missing': 15   # Structure issue
-        }
-        
+        # Deductions per issue type
         for issue in issues:
             issue_lower = issue.lower()
             
             if 'secret' in issue_lower:
-                base_score -= deductions['secret_leak']
+                base_score -= 50
             elif 'asing' in issue_lower or 'foreign' in issue_lower:
-                base_score -= deductions['foreign_text']
+                base_score -= 20
             elif 'lapisan' in issue_lower or 'layer' in issue_lower:
-                base_score -= deductions['missing_layers']
+                base_score -= 15
             elif 'melompat' in issue_lower or 'heading' in issue_lower:
-                base_score -= deductions['heading_error']
+                base_score -= 10
             elif 'pendek' in issue_lower:
-                base_score -= deductions['content_short']
+                base_score -= 10
             elif 'placeholder' in issue_lower or 'lorem' in issue_lower:
-                base_score -= deductions['placeholder']
+                base_score -= 5
             elif 'tidak ditemukan' in issue_lower or 'bab' in issue_lower:
-                base_score -= deductions['chapter_missing']
+                base_score -= 15
+            elif 'daftar isi' in issue_lower or 'ringkasan' in issue_lower:
+                base_score -= 10
             else:
-                base_score -= 5  # Default deduction
+                base_score -= 5
         
         return max(0.0, base_score)
     
@@ -234,25 +252,19 @@ class ReviewerAgent:
         if secret_leak:
             return "REJECT"
         
-        if score >= 80:
+        if score >= 90:
             return "PASS"
-        elif score >= 50:
+        elif score >= 60:
             return "REPAIR"
         else:
             return "REJECT"
     
     def execute_review(self) -> Dict[str, Any]:
-        """
-        Menjalankan review lengkap.
-        
-        Returns:
-            Dictionary review result.
-        """
+        """Menjalankan review lengkap."""
         logger.info("ReviewerAgent executing...")
         
         all_issues: List[str] = []
         
-        # Muat konten
         content = self.load_ebook()
         outline = self.load_outline()
         
@@ -265,17 +277,19 @@ class ReviewerAgent:
                 "issues": all_issues,
                 "repair_required": False,
                 "foreign_text_detected": False,
-                "foreign_text_patterns": [],
                 "missing_layers": [],
                 "heading_errors": [],
                 "secret_leak_detected": False,
+                "language_mix_score": 0,
                 "recommendation": "Ebook tidak dapat di-review karena file tidak ada atau kosong."
             }
             
             self.review_result = result
             return result
         
-        # Jalankan semua pemeriksaan
+        mode = outline.get("mode", "test") if outline else "test"
+        
+        # Run all checks
         if outline:
             chapter_issues = self.check_chapters(content, outline)
             all_issues.extend(chapter_issues)
@@ -291,13 +305,18 @@ class ReviewerAgent:
         heading_issues = self.check_heading_structure(content)
         all_issues.extend(heading_issues)
         
-        length_issues = self.check_content_length(content)
+        length_issues = self.check_content_length(content, mode)
         all_issues.extend(length_issues)
         
         placeholder_issues = self.check_placeholder_text(content)
         all_issues.extend(placeholder_issues)
         
-        # Hitung score
+        toc_issues = self.check_toc_and_summary(content)
+        all_issues.extend(toc_issues)
+        
+        language_score = self.check_language_mix(content)
+        
+        # Calculate score and status
         score = self.calculate_score(all_issues)
         status = self.determine_status(score, all_issues)
         
@@ -305,9 +324,9 @@ class ReviewerAgent:
         if status == "PASS":
             recommendation = "Ebook siap digunakan. Semua pemeriksaan passed."
         elif status == "REPAIR":
-            recommendation = "Ebook perlu perbaikan minor sebelum digunakan. Silakan jalankan Repair Agent."
+            recommendation = "Ebook perlu perbaikan minor sebelum digunakan."
         else:
-            recommendation = "Ebook tidak dapat digunakan karena issue kritikal. Perbaiki terlebih dahulu."
+            recommendation = "Ebook tidak dapat digunakan karena issue kritikal."
         
         result = {
             "status": status,
@@ -319,6 +338,8 @@ class ReviewerAgent:
             "missing_layers": layer_issues,
             "heading_errors": heading_issues,
             "secret_leak_detected": len(secret_issues) > 0,
+            "language_mix_score": round(language_score, 2),
+            "word_count": len(content.split()),
             "recommendation": recommendation
         }
         
