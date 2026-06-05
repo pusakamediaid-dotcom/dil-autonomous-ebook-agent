@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "description": "Monetization rules for DIL Content & Income Agent",
+  "modes_available": [
+    "affiliate_research",
+    "affiliate_content",
+    "affiliate_publish_plan",
+    "news_research",
+    "news_content",
+    "news_publish_plan",
+    "income_report"
+  ],
+  "global_rules": {
+    "auto_post_allowed": false,
+    "human_approval_required": true,
+    "draft_first_required": true,
+    "max_posts_per_day": 3,
+    "max_posts_per_week": 15,
+    "cooldown_between_posts_minutes": 120,
+    "disclosure_required": true,
+    "spam_forbidden": true,
+    "fake_claims_forbidden": true,
+    "clickbait_excessive_forbidden": true,
+    "login_scraping_forbidden": true,
+    "copyright_violation_forbidden": true
+  },
+  "cost_limits": {
+    "max_tokens_per_run": 50000,
+    "max_cost_per_run": 0.25,
+    "max_api_calls_per_run": 15
+  },
+  "approval_gates": {
+    "affiliate_content_publish": true,
+    "news_content_publish": true,
+    "affiliate_research_execute": false,
+    "news_research_execute": false,
+    "income_report_generate": false
+  },
+  "disclosures": {
+    "affiliate": "Catatan: tautan ini bisa berupa link affiliate. Jika Anda membeli melalui link ini, saya bisa mendapat komisi tanpa biaya tambahan untuk Anda.",
+    "news_summary": "Artikel ini merupakan ringkasan dan analisis singkat. Untuk informasi lengkap, silakan kunjungi sumber asli yang tercantum.",
+    "ai_generated": "Konten ini dibuat dengan bantuan AI dan telah diverifikasi oleh manusia sebelum dipublikasikan."
+  },
+  "forbidden_actions": [
+    "auto_post_without_approval",
+    "scrape_login_pages",
+    "fake_testimonials",
+    "guaranteed_income_claims",
+    "aggressive_buy_pressure",
+    "spam_comments",
+    "spam_dm",
+    "spam_posting",
+    "full_article_copy",
+    "news_without_source",
+    "fake_news",
+    "hate_speech",
+    "misleading_headlines"
+  ]
+}

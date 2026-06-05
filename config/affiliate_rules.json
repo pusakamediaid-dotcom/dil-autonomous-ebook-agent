@@ -1,0 +1,102 @@
+{
+  "schema_version": "1.0",
+  "description": "Affiliate commerce rules for DIL Agent",
+  "allowed_platforms": [
+    {
+      "id": "tokopedia",
+      "name": "Tokopedia Affiliate",
+      "type": "marketplace",
+      "data_sources_allowed": [
+        "official_api",
+        "public_product_page",
+        "user_manual_input",
+        "user_csv_upload"
+      ],
+      "data_sources_forbidden": [
+        "login_scraping",
+        "cookie_stealing",
+        "automated_browsing",
+        "rate_limited_ignored"
+      ],
+      "affiliate_disclosure_required": true,
+      "notes": "Hanya gunakan API resmi Tokopedia atau input manual. Jangan scraping halaman yang butuh login."
+    },
+    {
+      "id": "shopee",
+      "name": "Shopee Affiliate",
+      "type": "marketplace",
+      "data_sources_allowed": [
+        "official_api",
+        "public_product_page",
+        "user_manual_input"
+      ],
+      "data_sources_forbidden": [
+        "login_scraping",
+        "cookie_stealing"
+      ],
+      "affiliate_disclosure_required": true
+    },
+    {
+      "id": "manual",
+      "name": "Manual Input",
+      "type": "custom",
+      "data_sources_allowed": [
+        "user_manual_input",
+        "user_csv_upload"
+      ],
+      "data_sources_forbidden": [],
+      "affiliate_disclosure_required": true
+    }
+  ],
+  "product_criteria": {
+    "required": [
+      "legal_and_safe",
+      "relevant_to_niche",
+      "has_practical_benefit",
+      "reasonable_price"
+    ],
+    "preferred": [
+      "clear_commission_info",
+      "good_reviews",
+      "educational_value",
+      "suitable_for_target_audience"
+    ],
+    "forbidden": [
+      "illegal_products",
+      "dangerous_products",
+      "adult_only_products",
+      "gambling_products",
+      "weapons",
+      "fake_products",
+      "counterfeit_goods",
+      "get_rich_quick_schemes"
+    ]
+  },
+  "content_rules": {
+    "disclosure_mandatory": true,
+    "disclosure_text": "Catatan: tautan ini bisa berupa link affiliate. Jika Anda membeli melalui link ini, saya bisa mendapat komisi tanpa biaya tambahan untuk Anda.",
+    "max_products_per_draft": 5,
+    "min_content_quality_words": 100,
+    "required_sections": [
+      "product_name",
+      "why_recommended",
+      "target_buyer",
+      "content_angle",
+      "disclosure"
+    ],
+    "forbidden_claims": [
+      "pasti_menghasilkan_uang",
+      "jaminan_keberhasilan",
+      "testimoni_palsu",
+      "harga_palsu",
+      "diskon_palsu"
+    ]
+  },
+  "output_schema": {
+    "product_candidates_file": "output/affiliate/product_candidates.json",
+    "research_report_file": "output/affiliate/affiliate_research_report.json",
+    "content_drafts_file": "output/affiliate/content_drafts.md",
+    "publish_plan_file": "output/affiliate/affiliate_publish_plan.json",
+    "compliance_report_file": "output/affiliate/compliance_report.json"
+  }
+}

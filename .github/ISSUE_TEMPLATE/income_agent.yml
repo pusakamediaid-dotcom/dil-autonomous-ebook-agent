@@ -1,0 +1,169 @@
+name: Income Agent
+description: Run Affiliate Commerce or News Content Publishing Agent
+title: "[INCOME] "
+labels: ["income-agent-run"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## DIL Income Agent Request
+        
+        Isi formulir di bawah ini untuk menjalankan agent penghasilan.
+        
+        Mode tersedia:
+        - affiliate_research: Riset produk affiliate
+        - affiliate_content: Buat draft konten affiliate
+        - affiliate_publish_plan: Buat jadwal posting affiliate
+        - news_research: Riset berita dari sumber resmi
+        - news_content: Buat draft konten berita
+        - news_publish_plan: Buat jadwal posting berita
+        - income_report: Buat laporan potensi penghasilan
+        
+        ⚠️ Semua posting memerlukan approval manusia. Tidak ada auto-post.
+
+  - type: dropdown
+    id: income_mode
+    attributes:
+      label: Mode Agent
+      description: Mode eksekusi agent
+      options:
+        - affiliate_research
+        - affiliate_content
+        - affiliate_publish_plan
+        - news_research
+        - news_content
+        - news_publish_plan
+        - income_report
+    validations:
+      required: true
+
+  - type: input
+    id: niche
+    attributes:
+      label: Target Niche
+      description: Niche target untuk riset affiliate
+      placeholder: "Contoh: Produk digital, perlengkapan belajar, alat kerja kreator pemula"
+    validations:
+      required: false
+
+  - type: input
+    id: target_audience
+    attributes:
+      label: Target Audiens
+      description: Siapa target audiens
+      placeholder: "Contoh: Pelajar, mahasiswa, guru, kreator pemula, penjual ebook"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Platform target
+      options:
+        - tokopedia
+        - threads
+        - google
+        - blog
+        - manual
+    validations:
+      required: false
+
+  - type: input
+    id: topic
+    attributes:
+      label: Topik Berita
+      description: Topik berita untuk riset (untuk mode news)
+      placeholder: "Contoh: Berita teknologi dunia, AI, pendidikan digital"
+    validations:
+      required: false
+
+  - type: textarea
+    id: content_brief
+    attributes:
+      label: Brief Tugas
+      description: Brief konten atau instruksi khusus
+      placeholder: |
+        Jelaskan apa yang ingin Anda hasilkan.
+        
+        Contoh:
+        Cari kategori produk yang cocok untuk dipromosikan secara affiliate kepada audiens DIL.
+        Buat draft konten yang informatif dan tidak spam.
+    validations:
+      required: false
+
+  - type: textarea
+    id: manual_links
+    attributes:
+      label: Link Produk atau Sumber Manual
+      description: URL produk atau berita yang ingin diproses (opsional)
+      placeholder: |
+        Masukkan URL, satu per baris:
+        https://example.com/product-1
+        https://news.example.com/article-1
+    validations:
+      required: false
+
+  - type: number
+    id: max_drafts
+    attributes:
+      label: Jumlah Draft Konten
+      description: Berapa draft yang ingin dibuat
+      placeholder: "3"
+      min: 1
+      max: 10
+    validations:
+      required: false
+
+  - type: number
+    id: max_posts_per_day
+    attributes:
+      label: Batas Posting per Hari
+      description: Maksimal posting per hari (default 3)
+      placeholder: "3"
+      min: 1
+      max: 5
+    validations:
+      required: false
+
+  - type: confirm
+    id: approval
+    attributes:
+      label: Approval
+      description: Centang untuk konfirmasi persetujuan eksekusi
+      value: false
+    validations:
+      required: true
+
+  - type: textarea
+    id: special_notes
+    attributes:
+      label: Catatan Khusus
+      description: Catatan atau instruksi tambahan
+      placeholder: |
+        Contoh:
+        - Fokus pada produk edukatif
+        - Hindari produk berisiko tinggi
+        - Gunakan bahasa Indonesia rapi
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Checklist Sebelum Submit
+        
+        - [ ] Mode sudah dipilih dengan tepat
+        - [ ] Niche dan audiens sudah jelas
+        - [ ] Brief konten cukup detail
+        - [ ] Approval sudah diberikan
+        
+        ## Catatan Penting
+        
+        - Agent ini BUKAN mesin uang otomatis
+        - Semua output berupa DRAFT yang perlu review manusia
+        - Affiliate disclosure WAJIB disertakan
+        - Berita harus punya sumber
+        - Tidak ada auto-post tanpa approval
+        - Tidak ada scraping login
+        - API key harus di GitHub Secrets

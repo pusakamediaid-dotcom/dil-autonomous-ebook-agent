@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "description": "News source configuration for DIL News Agent",
+  "allowed_source_types": [
+    {
+      "type": "rss",
+      "description": "RSS feeds from official media outlets",
+      "examples": [
+        "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+        "https://feeds.bbci.co.uk/news/technology/rss.xml",
+        "https://www.theverge.com/rss/index.xml",
+        "https://techcrunch.com/feed/"
+      ],
+      "reliability": "high"
+    },
+    {
+      "type": "official_api",
+      "description": "Official news APIs with valid keys",
+      "examples": [
+        "NewsAPI.org",
+        "Google News API",
+        "Bing News Search API"
+      ],
+      "reliability": "high"
+    },
+    {
+      "type": "google_custom_search",
+      "description": "Google Custom Search API for news",
+      "required_secrets": ["GOOGLE_SEARCH_API_KEY", "GOOGLE_CSE_ID"],
+      "reliability": "high"
+    },
+    {
+      "type": "manual_input",
+      "description": "User provides news links or content directly",
+      "reliability": "depends_on_source"
+    },
+    {
+      "type": "official_websites",
+      "description": "Official websites of institutions, governments, organizations",
+      "reliability": "high"
+    }
+  ],
+  "forbidden_source_types": [
+    {
+      "type": "full_article_copy",
+      "reason": "Copyright violation"
+    },
+    {
+      "type": "unattributed_content",
+      "reason": "Must cite sources"
+    },
+    {
+      "type": "anonymous_sources_without_label",
+      "reason": "Must label unverified sources"
+    },
+    {
+      "type": "satire_as_news",
+      "reason": "Must distinguish satire from news"
+    }
+  ],
+  "reliability_rules": {
+    "must_have_source": true,
+    "must_have_url": true,
+    "must_label_opinion": true,
+    "must_label_analysis": true,
+    "must_separate_fact_from_opinion": true,
+    "max_quote_length_words": 50,
+    "require_attribution": true
+  },
+  "topic_categories": [
+    "technology",
+    "ai_and_automation",
+    "digital_education",
+    "creator_economy",
+    "business_and_startup",
+    "science",
+    "digital_literacy",
+    "cybersecurity",
+    "fintech",
+    "sustainability_tech"
+  ],
+  "output_schema": {
+    "research_report_file": "output/news/news_research_report.json",
+    "content_drafts_file": "output/news/news_content_drafts.md",
+    "compliance_report_file": "output/news/compliance_report.json"
+  }
+}

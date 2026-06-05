@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "description": "Publishing rules for DIL Content & Income Agent",
+  "max_posts_per_day": 3,
+  "max_posts_per_week": 15,
+  "cooldown_between_same_platform_minutes": 120,
+  "allowed_platforms": [
+    {
+      "id": "threads",
+      "name": "Threads (Meta)",
+      "max_chars": 500,
+      "max_images": 10,
+      "requires_disclosure": true,
+      "auto_post_allowed": false
+    },
+    {
+      "id": "google",
+      "name": "Google-friendly blog/website",
+      "max_chars": 10000,
+      "requires_disclosure": true,
+      "auto_post_allowed": false
+    },
+    {
+      "id": "blog",
+      "name": "Personal Blog",
+      "max_chars": 50000,
+      "requires_disclosure": true,
+      "auto_post_allowed": false
+    },
+    {
+      "id": "manual",
+      "name": "Manual posting by user",
+      "max_chars": null,
+      "requires_disclosure": true,
+      "auto_post_allowed": false
+    }
+  ],
+  "draft_first_required": true,
+  "approval_required": true,
+  "auto_post_allowed": false,
+  "no_spam_rules": {
+    "no_duplicate_content": true,
+    "no_repetitive_posting": true,
+    "no_comment_spam": true,
+    "no_dm_spam": true,
+    "variety_required": true,
+    "min_hours_between_similar_content": 24
+  },
+  "content_variation_rules": {
+    "require_different_angles": true,
+    "require_different_captions": true,
+    "max_similar_posts_per_week": 2
+  },
+  "schedule_rules": {
+    "preferred_hours": ["08:00", "12:00", "18:00", "21:00"],
+    "timezone": "Asia/Jakarta",
+    "no_posting_between": "00:00-06:00",
+    "weekend_reduction": true
+  }
+}

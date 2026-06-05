@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "description": "Compliance rules for DIL Content & Income Agent",
+  "affiliate_compliance_checklist": [
+    {
+      "id": "disclosure_present",
+      "check": "Affiliate disclosure is present in content",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_false_claims",
+      "check": "No false or misleading product claims",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_income_guarantee",
+      "check": "No guaranteed income claims",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_fake_testimonials",
+      "check": "No fake testimonials or reviews",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_dangerous_products",
+      "check": "No dangerous or illegal products",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_spam_cta",
+      "check": "No aggressive or spammy call-to-action",
+      "severity": "high",
+      "action_if_fail": "REPAIR"
+    },
+    {
+      "id": "no_manipulation",
+      "check": "No buyer manipulation tactics",
+      "severity": "high",
+      "action_if_fail": "REPAIR"
+    },
+    {
+      "id": "content_quality",
+      "check": "Content has minimum quality and substance",
+      "severity": "medium",
+      "action_if_fail": "REPAIR"
+    }
+  ],
+  "news_compliance_checklist": [
+    {
+      "id": "source_present",
+      "check": "Source is clearly cited",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_full_copy",
+      "check": "No full article copy",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_misinformation",
+      "check": "No misinformation or fake news",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_unsourced_claims",
+      "check": "No claims without sources",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "no_misleading_headline",
+      "check": "No misleading or sensationalist headlines",
+      "severity": "high",
+      "action_if_fail": "REPAIR"
+    },
+    {
+      "id": "fact_opinion_separated",
+      "check": "Fact and opinion are clearly separated",
+      "severity": "high",
+      "action_if_fail": "REPAIR"
+    },
+    {
+      "id": "no_hate_speech",
+      "check": "No hate speech or incitement",
+      "severity": "critical",
+      "action_if_fail": "REJECT"
+    },
+    {
+      "id": "labeled_as_summary",
+      "check": "Content labeled as summary or analysis",
+      "severity": "medium",
+      "action_if_fail": "REPAIR"
+    }
+  ],
+  "rejection_rules": {
+    "auto_reject_if": [
+      "secret_leak_detected",
+      "fake_news_detected",
+      "hate_speech_detected",
+      "no_source_at_all",
+      "full_article_copy",
+      "dangerous_product_promotion"
+    ]
+  },
+  "repair_rules": {
+    "auto_repair_if": [
+      "missing_disclosure",
+      "missing_source_label",
+      "excessive_clickbait",
+      "fact_opinion_not_separated",
+      "missing_summary_label"
+    ],
+    "max_repair_iterations": 2
+  }
+}
