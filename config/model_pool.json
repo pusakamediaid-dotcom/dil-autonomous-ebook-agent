@@ -9,4 +9,3 @@
       "env_secret_name": "PROVIDER_1_API_KEY",
       "base_url": "",
       "sdk_type": "openai",
-      "model_default": "g
