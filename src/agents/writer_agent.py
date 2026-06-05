@@ -101,7 +101,8 @@ class WriterAgent:
             self.ai_client = get_ai_client()
             self.secret_manager = get_secret_manager()
             
-            routing = self.load_routing_decision()
+            # Use already-loaded routing decision (loaded in execute())
+            routing = self.routing_decision
             
             if routing.get("status") != "success":
                 logger.info("Routing status tidak success - akan menggunakan fallback")

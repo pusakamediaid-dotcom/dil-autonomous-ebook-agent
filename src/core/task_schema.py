@@ -200,8 +200,9 @@ def validate_task_plan(plan: Dict[str, Any]) -> tuple[bool, List[str]]:
     if "chapters" in plan and not isinstance(plan["chapters"], list):
         errors.append("'chapters' must be a list")
     
-    if "mode" in plan and plan["mode"] not in ["planning", "test", "production"]:
-        errors.append("Invalid mode: must be 'planning', 'test', or 'production'")
+    valid_modes = ["planning", "test", "session", "review", "repair", "production"]
+    if "mode" in plan and plan["mode"] not in valid_modes:
+        errors.append(f"Invalid mode: must be one of {valid_modes}")
     
     return len(errors) == 0, errors
 

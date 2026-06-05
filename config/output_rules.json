@@ -46,6 +46,18 @@
       "description": "API provider selection decision"
     },
     {
+      "name": "fallback_info.json",
+      "type": "json",
+      "required": true,
+      "description": "Fallback usage info and reason"
+    },
+    {
+      "name": "review_report.json",
+      "type": "json",
+      "required": true,
+      "description": "Automated review result with score and issues"
+    },
+    {
       "name": "run_context.json",
       "type": "json",
       "required": false,
@@ -68,12 +80,11 @@
     "required_sections": [
       "[KONSEP]",
       "[ANALOGI]",
+      "[RUMUS]",
       "[CONTOH]",
       "[APLIKASI]"
     ],
-    "optional_sections": [
-      "[RUMUS]"
-    ],
+    "optional_sections": [],
     "encoding": "utf-8",
     "line_ending": "unix"
   },

@@ -28,6 +28,7 @@ class ReviewerAgent:
         
         self.ebook_path = self.output_dir / "ebook.md"
         self.outline_path = self.output_dir / "outline.json"
+        self.fallback_info_path = self.output_dir / "fallback_info.json"
         
         self.review_result: Dict[str, Any] = {}
     
@@ -186,6 +187,54 @@ class ReviewerAgent:
         
         return issues
     
+    def load_fallback_info(self) -> Optional[Dict[str, Any]]:
+        """Memuat fallback info jika ada."""
+        try:
+            if self.fallback_info_path.exists():
+                with open(self.fallback_info_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return None
+        except Exception as e:
+            logger.error(f"Error memuat fallback info: {e}")
+            return None
+    
+    def check_fallback_usage(self, fallback_info: Optional[Dict[str, Any]]) -> List[str]:
+        """Memeriksa apakah fallback digunakan dan menandai masalah kualitas."""
+        issues = []
+        
+        if fallback_info and fallback_info.get("fallback_used"):
+            reason = fallback_info.get("fallback_reason", "unknown")
+            issues.append(f"Fallback digunakan: {reason}")
+            logger.warning(f"Fallback terdeteksi: {reason}")
+        
+        return issues
+    
+    def check_generic_content(self, content: str) -> List[str]:
+        """Mendeteksi konten generik/template yang tidak spesifik."""
+        issues = []
+        
+        # Pola kalimat generik fallback yang terlalu umum
+        generic_patterns = [
+            (r'Pembahasan umum tentang topik ini\.', 'Brief konten tidak terpakai (hanya template)'),
+            (r'proses belajar bertahap\. Pertama kita memahami konsep dasar', 'Analogi terlalu generik/template'),
+            (r'Pahami dasar-dasar konsep secara menyeluruh', 'RUMUS hanya template tanpa substansi'),
+            (r'Pahami definisi dan ruang lingkup secara jelas', 'CONTOH hanya template tanpa contoh nyata'),
+            (r'Mulailah dari konsep dasar, praktikkan secara bertahap', 'APLIKASI hanya template umum'),
+            (r'bagian ini telah disesuaikan untuk memenuhi standar kualitas', 'Repair placeholder terdeteksi'),
+        ]
+        
+        generic_count = 0
+        for pattern, message in generic_patterns:
+            if re.search(pattern, content, re.IGNORECASE):
+                generic_count += 1
+                issues.append(message)
+        
+        # Jika >= 3 pola generik terdeteksi, konten adalah template fallback
+        if generic_count >= 3:
+            issues.append(f"Konten adalah template fallback generik ({generic_count} pola terdeteksi)")
+        
+        return issues
+    
     def check_language_mix(self, content: str) -> float:
         """
         Check tingkat campur bahasa Inggris.
@@ -226,6 +275,18 @@ class ReviewerAgent:
             
             if 'secret' in issue_lower:
                 base_score -= 50
+            elif 'fallback digunakan' in issue_lower:
+                base_score -= 25  # Major penalty for fallback
+            elif 'template fallback generik' in issue_lower:
+                base_score -= 30  # Major penalty for generic template
+            elif 'analogi terlalu generik' in issue_lower or 'rumus hanya template' in issue_lower:
+                base_score -= 15  # Penalty for template content per layer
+            elif 'contoh hanya template' in issue_lower or 'aplikasi hanya template' in issue_lower:
+                base_score -= 15
+            elif 'brief konten tidak terpakai' in issue_lower:
+                base_score -= 20  # Brief not utilized
+            elif 'repair placeholder' in issue_lower:
+                base_score -= 15
             elif 'asing' in issue_lower or 'foreign' in issue_lower:
                 base_score -= 20
             elif 'lapisan' in issue_lower or 'layer' in issue_lower:
@@ -267,6 +328,7 @@ class ReviewerAgent:
         
         content = self.load_ebook()
         outline = self.load_outline()
+        fallback_info = self.load_fallback_info()
         
         if not content:
             all_issues.append("Ebook file tidak ditemukan atau kosong")
@@ -314,6 +376,14 @@ class ReviewerAgent:
         toc_issues = self.check_toc_and_summary(content)
         all_issues.extend(toc_issues)
         
+        # NEW: Check fallback usage
+        fallback_issues = self.check_fallback_usage(fallback_info)
+        all_issues.extend(fallback_issues)
+        
+        # NEW: Check for generic/template content
+        generic_issues = self.check_generic_content(content)
+        all_issues.extend(generic_issues)
+        
         language_score = self.check_language_mix(content)
         
         # Calculate score and status
@@ -328,6 +398,10 @@ class ReviewerAgent:
         else:
             recommendation = "Ebook tidak dapat digunakan karena issue kritikal."
         
+        # Add context-aware recommendation
+        if fallback_info and fallback_info.get("fallback_used"):
+            recommendation += " CATATAN: Output dihasilkan oleh fallback template, bukan AI. Kualitas sangat terbatas."
+        
         result = {
             "status": status,
             "score": round(score, 2),
@@ -340,6 +414,8 @@ class ReviewerAgent:
             "secret_leak_detected": len(secret_issues) > 0,
             "language_mix_score": round(language_score, 2),
             "word_count": len(content.split()),
+            "fallback_used": fallback_info.get("fallback_used", False) if fallback_info else False,
+            "fallback_reason": fallback_info.get("fallback_reason", "") if fallback_info else "",
             "recommendation": recommendation
         }
         

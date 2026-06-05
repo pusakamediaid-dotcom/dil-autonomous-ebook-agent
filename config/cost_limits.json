@@ -24,6 +24,11 @@
       "max_cost": 0.10,
       "max_chapters": 5
     },
+    "session": {
+      "max_tokens": 50000,
+      "max_cost": 0.25,
+      "max_chapters": 4
+    },
     "production": {
       "max_tokens": 100000,
       "max_cost": 0.50,
