@@ -1,0 +1,12 @@
+{
+  "schema_version": "3.0",
+  "description": "Konfigurasi pool provider API untuk DIL Autonomous Ebook Agent",
+  "note": "API key TIDAK disimpan di file ini. API key wajib disimpan di GitHub Secrets.",
+  "providers": [
+    {
+      "provider_id": "provider_1",
+      "provider_name": "OpenAI GPT",
+      "env_secret_name": "PROVIDER_1_API_KEY",
+      "base_url": "",
+      "sdk_type": "openai",
+      "model_default": "g
