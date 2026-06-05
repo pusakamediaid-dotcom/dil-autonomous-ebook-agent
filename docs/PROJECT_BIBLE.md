@@ -11,6 +11,4 @@
 
 ## Tujuan Utama
 
-Menghasilkan ebook teknis berkualitas tinggi yang layak dijual secara komersial, dengan konten yang akurat, terstruktur, aman, dan sesuai untuk level pembaca yang ditargetkan.
-
-## Standar K
+Menghasilkan ebook teknis berkualitas tinggi yang layak dijual secara kom
