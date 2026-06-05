@@ -69,25 +69,25 @@ jobs:
   generate-ebook:
     name: Generate Ebook
     runs-on: ubuntu-latest
-    
+
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event.issue && (
         contains(github.event.issue.labels.*.name, 'agent-run') ||
         contains(github.event.issue.labels.*.name, 'generate-ebook')
       ))
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
+
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
@@ -95,14 +95,14 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-      
+
       - name: Validate Python syntax
         run: |
           echo "=== Validating Python files ==="
@@ -113,18 +113,15 @@ jobs:
             echo "Python validation failed"
             exit 1
           fi
-      
+
       - name: Run Ebook Generator
         run: |
           python src/generator.py
         env:
-          # GitHub context
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_ISSUE_NUMBER: ${{ github.event.issue.number || '' }}
           GITHUB_ISSUE_TITLE: ${{ github.event.issue.title || inputs.ebook_title || '' }}
           GITHUB_ISSUE_BODY: ${{ github.event.issue.body || '' }}
-          
-          # Workflow dispatch inputs
           INPUT_MODE: ${{ inputs.mode }}
           INPUT_EBOOK_TITLE: ${{ inputs.ebook_title || '' }}
           INPUT_TARGET_AUDIENCE: ${{ inputs.target_audience || '' }}
@@ -136,14 +133,12 @@ jobs:
           INPUT_SPECIAL_INSTRUCTIONS: ${{ inputs.special_instructions || '' }}
           INPUT_API_PREFERENCE: ${{ inputs.api_preference || 'auto' }}
           INPUT_APPROVAL: ${{ inputs.approval && 'true' || 'false' }}
-          
-          # API Keys from Secrets
           PROVIDER_1_API_KEY: ${{ secrets.PROVIDER_1_API_KEY }}
           PROVIDER_2_API_KEY: ${{ secrets.PROVIDER_2_API_KEY }}
           PROVIDER_3_API_KEY: ${{ secrets.PROVIDER_3_API_KEY }}
           PROVIDER_4_API_KEY: ${{ secrets.PROVIDER_4_API_KEY }}
           PROVIDER_5_API_KEY: ${{ secrets.PROVIDER_5_API_KEY }}
-      
+
       - name: Display output files
         run: |
           echo "=== Generated Output Files ==="
@@ -152,7 +147,7 @@ jobs:
           else
             echo "No output directory found"
           fi
-      
+
       - name: Upload all artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -160,94 +155,3 @@ jobs:
           name: ebook-output
           path: output/
           retention-days: 30
-      
-      - name: Create GitHub Issue Comment
-        if: github.event_name == 'issues'
-        run: |
-          python3 << 'PYTHON_SCRIPT'
-          import json
-          import os
-          import urllib.request
-          import urllib.parse
-          
-          # Read run_report.json if exists
-          report_data = {}
-          try:
-              with open('output/run_report.json', 'r') as f:
-                  report_data = json.load(f)
-          except:
-              pass
-          
-          # Build comment
-          status = report_data.get('status', 'UNKNOWN')
-          mode = report_data.get('mode', 'UNKNOWN')
-          
-          # Agents info
-          execution = report_data.get('execution', {})
-          agents_executed = execution.get('agents_executed', [])
-          agents_failed = execution.get('agents_failed', [])
-          
-          # Summary
-          summary = report_data.get('summary', {})
-          total_tokens = summary.get('total_tokens_used', 0)
-          total_cost = summary.get('total_cost_usd', 0)
-          
-          # Fallback info
-          fallback_info = report_data.get('fallback_info', {})
-          fallback_used = fallback_info.get('fallback_used', False)
-          fallback_reason = fallback_info.get('fallback_reason', '')
-          provider_used = fallback_info.get('provider_used', 'unknown')
-          
-          # Build comment text
-          lines = [
-              "Ebook generation completed.",
-              "",
-              f"Status: {status}",
-              f"Mode: {mode}",
-              f"Agents executed: {len(agents_executed)}",
-              f"Agents failed: {len(agents_failed)}",
-              f"Total cost: ${total_cost:.4f}",
-          ]
-          
-          if fallback_used:
-              lines.append(f"Fallback used: Yes")
-              if fallback_reason:
-                  lines.append(f"Fallback reason: {fallback_reason[:100]}")
-          
-          if provider_used and provider_used != 'unknown':
-              lines.append(f"Provider used: {provider_used}")
-          
-          lines.append("")
-          lines.append("Artifacts available in Actions run.")
-          
-          comment_body = "\n".join(lines)
-          
-          # Create comment via GitHub API
-          issue_number = os.environ.get('GITHUB_ISSUE_NUMBER', '')
-          if not issue_number:
-              print("No issue number, skipping comment")
-              exit(0)
-          
-          api_url = f"https://api.github.com/repos/{os.environ.get('GITHUB_REPOSITORY')}/issues/{issue_number}/comments"
-          
-          payload = json.dumps({"body": comment_body}).encode('utf-8')
-          
-          req = urllib.request.Request(
-              api_url,
-              data=payload,
-              headers={
-                  'Content-Type': 'application/json',
-                  'Authorization': f"Bearer {os.environ.get('GITHUB_TOKEN')}",
-                  'Accept': 'application/vnd.github.v3+json'
-              },
-              method='POST'
-          )
-          
-          try:
-              with urllib.request.urlopen(req, timeout=30) as response:
-                  print(f"Comment created successfully")
-          except Exception as e:
-              print(f"Failed to create comment: {e}")
-          
-          PYTHON_SCRIPT
-        shell: python3
