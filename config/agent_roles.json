@@ -1,0 +1,29 @@
+{
+  "schema_version": "3.0",
+  "task_to_model_preference": {
+    "outline": "fast",
+    "write_chapter": "strong",
+    "write_subtopic": "strong",
+    "review": "fast",
+    "repair": "fast",
+    "summary": "fast",
+    "validate": "local",
+    "html_convert": "local",
+    "pdf_convert": "local",
+    "plan": "fast"
+  },
+  "max_retries_per_task": 3,
+  "retry_delay_seconds": 5,
+  "retry_on_errors": [
+    "timeout",
+    "rate_limit",
+    "server_error",
+    "connection_error"
+  ],
+  "fail_on_errors": [
+    "invalid_api_key",
+    "safety_block",
+    "context_too_long",
+    "quota_exceeded"
+  ]
+}
