@@ -1,0 +1,53 @@
+{
+  "schema_version": "3.0",
+  "required_outputs_by_mode": {
+    "planning": ["task_plan.json", "run_report.json", "cost_report.json"],
+    "test": [
+      "task_plan.json",
+      "outline.json",
+      "ebook.md",
+      "review_report.json",
+      "run_report.json",
+      "cost_report.json",
+      "error_log.txt"
+    ],
+    "session": [
+      "task_plan.json",
+      "outline.json",
+      "ebook.md",
+      "review_report.json",
+      "run_report.json",
+      "cost_report.json",
+      "error_log.txt",
+      "diagram_report.json"
+    ],
+    "full": [
+      "task_plan.json",
+      "outline.json",
+      "ebook.md",
+      "ebook.pdf",
+      "review_report.json",
+      "run_report.json",
+      "cost_report.json",
+      "error_log.txt",
+      "diagram_report.json"
+    ],
+    "review": [
+      "review_report.json",
+      "run_report.json",
+      "cost_report.json",
+      "error_log.txt"
+    ],
+    "repair": [
+      "repair_log.json",
+      "review_report.json",
+      "run_report.json",
+      "cost_report.json",
+      "error_log.txt"
+    ]
+  },
+  "minimum_chapter_words": 800,
+  "minimum_subtopic_words": 400,
+  "minimum_review_score_for_pdf": 70,
+  "maximum_repair_iterations": 2
+}
