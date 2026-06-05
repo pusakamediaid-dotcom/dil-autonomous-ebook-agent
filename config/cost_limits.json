@@ -1,0 +1,54 @@
+{
+  "schema_version": "3.0",
+  "global_limits": {
+    "max_tokens_per_run": 300000,
+    "max_usd_per_run": 1.0,
+    "max_usd_per_day": 5.0,
+    "token_warning_threshold": 200000,
+    "usd_warning_threshold": 0.7
+  },
+  "per_mode_limits": {
+    "planning": {
+      "max_tokens_per_run": 20000,
+      "max_usd_per_run": 0.05
+    },
+    "test": {
+      "max_tokens_per_run": 50000,
+      "max_usd_per_run": 0.1
+    },
+    "session": {
+      "max_tokens_per_run": 150000,
+      "max_usd_per_run": 0.4
+    },
+    "full": {
+      "max_tokens_per_run": 300000,
+      "max_usd_per_run": 1.0,
+      "requires_approval": true
+    },
+    "review": {
+      "max_tokens_per_run": 80000,
+      "max_usd_per_run": 0.2
+    },
+    "repair": {
+      "max_tokens_per_run": 100000,
+      "max_usd_per_run": 0.3
+    },
+    "html": {
+      "max_tokens_per_run": 0,
+      "max_usd_per_run": 0.0
+    },
+    "pdf": {
+      "max_tokens_per_run": 0,
+      "max_usd_per_run": 0.0
+    },
+    "archive": {
+      "max_tokens_per_run": 0,
+      "max_usd_per_run": 0.0
+    }
+  },
+  "approval_triggers": {
+    "min_usd_to_trigger_approval": 0.5,
+    "min_tokens_to_trigger_approval": 200000,
+    "always_require_approval_for_modes": ["full"]
+  }
+}
