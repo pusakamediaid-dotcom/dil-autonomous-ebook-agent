@@ -1,0 +1,31 @@
+# Output files
+output/*.pdf
+output/*.md
+output/*.json
+output/*.txt
+output/diagrams/*.svg
+output/diagrams/*.mmd
+
+# Memory run reports
+memory/RUN_REPORTS/*.json
+
+# Environment
+.env
+*.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
