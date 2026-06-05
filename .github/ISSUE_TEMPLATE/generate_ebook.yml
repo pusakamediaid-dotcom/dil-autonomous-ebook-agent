@@ -6,13 +6,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        ## 📚 Ebook Generation Request
+        ## Ebook Generation Request
         
-        Selamat! Anda telah sampai di formulir generasi ebook otomatis.
-        Isi form di bawah ini untuk memulai proses pembuatan ebook.
+        Isi formulir di bawah ini untuk memulai proses pembuatan ebook.
+        Mode yang tersedia: planning, test, session, full, review, repair, html, pdf.
         
-        > **Note:** Label `generate-ebook` atau `agent-run` akan memicu GitHub Actions.
-        > Gunakan mode `test` untuk percobaan, `production` untuk hasil final.
+        Label agent-run atau generate-ebook akan memicu GitHub Actions.
 
   - type: input
     id: ebook_title
@@ -27,7 +26,7 @@ body:
     id: target_audience
     attributes:
       label: Target Pembaca
-      description: Siapa target pembaca ebook ini?
+      description: Siapa target pembaca ebook ini
       placeholder: "Contoh: Developer Python tingkat menengah"
     validations:
       required: true
@@ -48,11 +47,16 @@ body:
     id: mode
     attributes:
       label: Mode Produksi
-      description: Mode eksekusi generasi
+      description: Mode eksekusi generasi ebook
       options:
-        - test
         - planning
-        - production
+        - test
+        - session
+        - full
+        - review
+        - repair
+        - html
+        - pdf
     validations:
       required: true
 
@@ -60,12 +64,30 @@ body:
     id: total_chapters
     attributes:
       label: Jumlah Bab
-      description: Berapa bab yang diinginkan (test mode: 1 bab saja)
+      description: Berapa bab yang diinginkan
       placeholder: "1-20"
       min: 1
-      max: 50
+      max: 20
     validations:
       required: true
+
+  - type: number
+    id: target_pages
+    attributes:
+      label: Target Halaman
+      description: Estimasi jumlah halaman (opsional)
+      placeholder: "20-200"
+      min: 1
+      max: 500
+
+  - type: number
+    id: session_number
+    attributes:
+      label: Nomor Sesi
+      description: Nomor sesi jika mode session (1-4)
+      placeholder: "1"
+      min: 1
+      max: 4
 
   - type: textarea
     id: content_brief
@@ -82,6 +104,17 @@ body:
         - Praktik kode dengan Python dan scikit-learn
     validations:
       required: true
+
+  - type: textarea
+    id: special_instructions
+    attributes:
+      label: Aturan Khusus
+      description: Instruksi khusus atau preferensi konten (opsional)
+      placeholder: |
+        Contoh:
+        - Fokus pada contoh kode praktis
+        - Hindari jargon teknis yang terlalu kompleks
+        - Sertakan diagram jika memungkinkan
 
   - type: dropdown
     id: api_preference
@@ -101,8 +134,8 @@ body:
   - type: confirm
     id: pdf_required
     attributes:
-      label: Apakah PDF diperlukan?
-      description: Jika ya, output akan mencakup konversi ke PDF (belum tersedia di MVP)
+      label: PDF diperlukan
+      description: Centang jika output perlu dikonversi ke PDF
       value: false
 
   - type: confirm
@@ -117,16 +150,19 @@ body:
   - type: markdown
     attributes:
       value: |
-        ---
-
-        ## ✅ Checklist Sebelum Submit
-
+        ## Checklist Sebelum Submit
+        
         - [ ] Judul ebook sudah jelas dan spesifik
         - [ ] Target pembaca sudah teridentifikasi
         - [ ] Level pembaca sesuai dengan konten
         - [ ] Brief konten cukup detail
         - [ ] Mode yang dipilih sudah tepat
-        - [ ] Approval sudah diberikan
-
-        > ⚠️ **Peringatan:** Eksekusi akan menggunakan API credits.
-        > Pastikan budget tersedia di GitHub Secrets.
+        - [ ] Approval sudah diberikan untuk mode besar
+        
+        ## Catatan Penting
+        
+        - Mode test: 1 bab pendek untuk validasi
+        - Mode session: 3-4 bab untuk satu sesi produksi
+        - Mode full: Memerlukan approval eksplisit
+        - Semua API memiliki kuota dan biaya masing-masing
+        - Tidak ada klaim gratis tanpa limit

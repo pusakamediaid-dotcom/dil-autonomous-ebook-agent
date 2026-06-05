@@ -1,7 +1,7 @@
 """
 DIL Autonomous Ebook Agent - Router Agent
 
-Selects the best available API provider based on priorities and availability.
+Memilih provider API terbaik berdasarkan prioritas dan ketersediaan.
 """
 
 import json
@@ -17,16 +17,16 @@ logger = get_logger(__name__)
 
 class RouterAgent:
     """
-    Agent that routes requests to the best available API provider.
-    Checks provider availability and selects based on priority.
+    Agent yang merutekan request ke provider API terbaik.
+    Memeriksa ketersediaan provider dan memilih berdasarkan prioritas.
     """
     
     def __init__(self, config_dir: str = "config"):
         """
-        Initialize RouterAgent.
+        Inisialisasi RouterAgent.
         
         Args:
-            config_dir: Path to config directory.
+            config_dir: Path ke direktori config.
         """
         self.config_dir = Path(config_dir)
         self.output_dir = Path("output")
@@ -38,31 +38,31 @@ class RouterAgent:
         self.routing_decision: Dict[str, Any] = {}
     
     def _load_model_pool(self) -> Dict[str, Any]:
-        """Load model pool configuration."""
+        """Memuat konfigurasi model pool."""
         model_pool_path = self.config_dir / "model_pool.json"
         
         try:
             if model_pool_path.exists():
                 with open(model_pool_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    logger.info(f"Loaded model pool with {len(data.get('providers', []))} providers")
+                    logger.info(f"Loaded model pool dengan {len(data.get('providers', []))} providers")
                     return data
             else:
-                logger.warning(f"Model pool not found: {model_pool_path}")
+                logger.warning(f"Model pool tidak ditemukan: {model_pool_path}")
                 return {"providers": []}
         except Exception as e:
-            logger.error(f"Error loading model pool: {e}")
+            logger.error(f"Error memuat model pool: {e}")
             return {"providers": []}
     
     def get_available_providers(self) -> List[Dict[str, Any]]:
         """
-        Get list of providers with valid API keys.
+        Mendapatkan daftar provider dengan API key valid.
         
         Returns:
-            List of available provider configurations.
+            List konfigurasi provider yang tersedia.
         """
         available = self.secret_manager.get_available_providers()
-        logger.info(f"Found {len(available)} available providers")
+        logger.info(f"Ditemukan {len(available)} provider tersedia")
         return available
     
     def select_provider(
@@ -71,77 +71,66 @@ class RouterAgent:
         available: Optional[List[Dict[str, Any]]] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Select the best provider based on preference and availability.
+        Memilih provider terbaik berdasarkan preference dan ketersediaan.
         
         Args:
-            preference: Preferred provider ID (or "auto").
-            available: List of available providers.
+            preference: Provider ID yang dipilih (atau "auto").
+            available: List provider yang tersedia.
         
         Returns:
-            Selected provider config or None.
+            Konfigurasi provider yang dipilih atau None.
         """
         if available is None:
             available = self.get_available_providers()
         
         if not available:
-            logger.error("No providers available!")
+            logger.error("Tidak ada provider tersedia!")
             return None
         
-        # If preference specified and available, use it
+        # Jika preference ditentukan dan tersedia, gunakan
         if preference and preference != "auto":
             for provider in available:
                 if provider.get("id") == preference:
-                    logger.info(f"Selected preferred provider: {preference}")
+                    logger.info(f"Provider dipilih sesuai preference: {preference}")
                     return provider
             
-            # Preference not available, use first available
-            logger.warning(f"Preferred provider {preference} not available, using fallback")
+            # Preference tidak tersedia, gunakan fallback
+            logger.warning(f"Provider preference {preference} tidak tersedia, menggunakan fallback")
         
-        # Use first available (already sorted by priority)
+        # Gunakan provider dengan priority tertinggi (sudah terurut)
         selected = available[0]
-        logger.info(f"Selected provider (by priority): {selected.get('id')}")
+        logger.info(f"Provider dipilih (by priority): {selected.get('id')} - {selected.get('provider_name')}")
         
         return selected
     
-    def get_model_for_provider(
+    def build_fallback_chain(
         self,
-        provider: Dict[str, Any],
-        reading_level: str = "intermediate"
-    ) -> Optional[Dict[str, Any]]:
+        selected: Optional[Dict[str, Any]],
+        available: List[Dict[str, Any]]
+    ) -> List[str]:
         """
-        Select appropriate model for provider based on reading level.
+        Membangun chain fallback provider.
         
         Args:
-            provider: Provider configuration.
-            reading_level: Target reading level.
+            selected: Provider yang dipilih.
+            available: List provider yang tersedia.
         
         Returns:
-            Selected model configuration.
+            List ID provider dalam urutan fallback.
         """
-        models = provider.get("models", [])
+        chain = []
         
-        if not models:
-            logger.warning(f"No models available for {provider.get('id')}")
-            return None
+        if selected:
+            # Tambahkan selected provider pertama
+            chain.append(selected.get("id"))
         
-        # For MVP, just return first model (could be enhanced with level-based selection)
-        # Map reading levels to preferred model tiers
-        level_preference = {
-            "beginner": "mini",
-            "intermediate": "standard",
-            "advanced": "pro"
-        }
+        # Tambahkan provider lain sebagai fallback
+        for provider in available:
+            provider_id = provider.get("id")
+            if provider_id not in chain:
+                chain.append(provider_id)
         
-        preferred_tier = level_preference.get(reading_level, "standard")
-        
-        # Try to find model matching preferred tier
-        for model in models:
-            model_id = model.get("id", "").lower()
-            if preferred_tier in model_id or "standard" in model_id:
-                return model
-        
-        # Fallback to first model
-        return models[0]
+        return chain
     
     def make_routing_decision(
         self,
@@ -149,47 +138,49 @@ class RouterAgent:
         available: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
-        Create routing decision based on context and availability.
+        Membuat keputusan routing berdasarkan context dan ketersediaan.
         
         Args:
-            run_context: Current run context.
-            available: List of available providers.
+            run_context: Run context saat ini.
+            available: List provider yang tersedia.
         
         Returns:
-            Routing decision dictionary.
+            Dictionary keputusan routing.
         """
-        # Get available providers
+        # Dapatkan provider yang tersedia
         if available is None:
             available = self.get_available_providers()
         
-        # Select provider
+        # Pilih provider
         selected = self.select_provider(run_context.api_preference, available)
         
         if not selected:
             decision = {
                 "status": "failed",
-                "reason": "No API providers available",
-                "run_id": run_context.run_id
+                "reason": "Tidak ada provider API yang tersedia. Pastikan GitHub Secrets sudah dikonfigurasi.",
+                "run_id": run_context.run_id,
+                "provider_available_count": 0,
+                "fallback_chain": []
             }
         else:
-            # Get model
-            model = self.get_model_for_provider(selected, run_context.reading_level)
+            # Bangun fallback chain
+            fallback_chain = self.build_fallback_chain(selected, available)
             
             decision = {
                 "status": "success",
                 "run_id": run_context.run_id,
-                "selected_provider": {
-                    "id": selected.get("id"),
-                    "name": selected.get("name"),
-                    "api_endpoint": selected.get("api_endpoint")
-                },
-                "selected_model": model,
-                "alternative_providers": [
-                    {"id": p.get("id"), "name": p.get("name")}
-                    for p in available[1:5]  # Up to 4 alternatives
-                ],
+                "selected_provider_id": selected.get("id"),
+                "selected_provider_name": selected.get("provider_name"),
+                "selected_sdk_type": selected.get("sdk_type"),
+                "selected_base_url": selected.get("base_url"),
+                "selected_model_fast": selected.get("model_fast"),
+                "selected_model_strong": selected.get("model_strong"),
+                "fallback_chain": fallback_chain,
+                "provider_available_count": len(available),
                 "preference_used": run_context.api_preference,
-                "fallback_used": run_context.api_preference not in [p.get("id") for p in available]
+                "fallback_used": run_context.api_preference not in [p.get("id") for p in available] if run_context.api_preference else False,
+                "reason": f"Provider {selected.get('provider_name')} dipilih" + 
+                         (" (fallback)" if run_context.api_preference and run_context.api_preference != selected.get("id") else "")
             }
             
             # Update run context
@@ -202,13 +193,13 @@ class RouterAgent:
     
     def save_routing_decision(self, output_file: str = "output/routing_decision.json") -> None:
         """
-        Save routing decision to JSON file.
+        Menyimpan keputusan routing ke file JSON.
         
         Args:
-            output_file: Output file path.
+            output_file: Path file output.
         """
         if not self.routing_decision:
-            logger.warning("No routing decision to save")
+            logger.warning("Tidak ada routing decision untuk disimpan")
             return
         
         output_path = Path(output_file)
@@ -217,17 +208,17 @@ class RouterAgent:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(self.routing_decision, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Routing decision saved to {output_path}")
+        logger.info(f"Routing decision disimpan ke {output_path}")
     
     def execute(self, run_context: RunContext) -> Dict[str, Any]:
         """
-        Execute router agent.
+        Menjalankan router agent.
         
         Args:
-            run_context: Current run context.
+            run_context: Run context saat ini.
         
         Returns:
-            Routing decision dictionary.
+            Dictionary keputusan routing.
         """
         logger.info("RouterAgent executing...")
         
@@ -241,13 +232,13 @@ class RouterAgent:
 
 def run_router_agent(run_context: RunContext) -> Dict[str, Any]:
     """
-    Convenience function to run RouterAgent.
+    Fungsi convenience untuk menjalankan RouterAgent.
     
     Args:
-        run_context: Current run context.
+        run_context: Run context saat ini.
     
     Returns:
-        Routing decision dictionary.
+        Dictionary keputusan routing.
     """
     agent = RouterAgent()
     return agent.execute(run_context)

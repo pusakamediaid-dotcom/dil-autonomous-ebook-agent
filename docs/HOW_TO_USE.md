@@ -1,21 +1,20 @@
-# How to Use
+# How to Use - DIL Ebook Agent
 
 ## Quick Start
 
 ### 1. Setup GitHub Secrets
 
-Di repository Settings → Secrets and variables → Actions:
+Di repository Settings, tambahkan secrets:
 
 ```
 PROVIDER_1_API_KEY=sk-your-openai-key
-PROVIDER_2_API_KEY=sk-ant-your-anthropic-key
+PROVIDER_2_API_KEY=your-gemini-key
 PROVIDER_3_API_KEY=your-gemini-key
-# ... dst
+PROVIDER_4_API_KEY=your-gemini-key
+PROVIDER_5_API_KEY=your-openrouter-key
 ```
 
-### 2. Create GitHub Issue
-
-Buat issue baru dengan format:
+### 2. Buat GitHub Issue
 
 ```yaml
 title: "[EBOOK] Belajar Python untuk Pemula"
@@ -32,27 +31,81 @@ content_brief: |
 approval: true
 ```
 
-### 3. Add Label
+### 3. Tambahkan Label
 
-Tambahkan label `generate-ebook` ke issue.
+Tambahkan label `generate-ebook` atau `agent-run` ke issue.
 
-### 4. Watch Actions Run
+### 4. Pantau Actions
 
-Monitor progress di Actions tab.
+Monitor progress di tab Actions. Download artifacts saat selesai.
 
-### 5. Download Artifacts
+## Mode Produksi
 
-Download generated files dari Artifacts section.
+### Mode Test
+- 1 bab pendek
+- 2-3 subbab
+- Untuk validasi awal
+- Biaya minimal
 
-## Manual Trigger
+### Mode Session
+- 3-4 bab
+- Untuk satu sesi produksi ebook besar
+- Maksimal 4 sesi untuk ebook penuh
+- Perlu approval untuk lebih dari 4 bab
 
-Untuk testing, bisa trigger manual:
+### Mode Full
+- Ebook lengkap sesuai jumlah bab
+- Wajib approval eksplisit
+- Biaya lebih tinggi
 
-1. Go to Actions tab
-2. Select "DIL Ebook Agent Run"
-3. Click "Run workflow"
-4. Fill inputs
-5. Click "Run workflow"
+### Mode Planning
+- Hanya membuat task plan
+- Estimasi biaya
+- Tidak menghasilkan konten
+
+## Reading Output
+
+### run_report.json
+
+```json
+{
+  "status": "SUCCESS",
+  "mode": "session",
+  "execution": {
+    "agents_executed": ["memory_agent", "task_planner_agent", ...],
+    "agents_failed": []
+  },
+  "summary": {
+    "total_tokens_used": 5000,
+    "total_cost_usd": 0.025
+  }
+}
+```
+
+### cost_report.json
+
+```json
+{
+  "total_tokens": 5000,
+  "total_cost_usd": 0.025,
+  "limits": {
+    "max_tokens_per_run": 100000,
+    "max_cost_per_run": 0.50
+  }
+}
+```
+
+### review_report.json
+
+```json
+{
+  "status": "PASS",
+  "score": 95,
+  "issues": [],
+  "foreign_text_detected": false,
+  "secret_leak_detected": false
+}
+```
 
 ## Local Development
 
@@ -67,57 +120,36 @@ pip install -r requirements.txt
 # Set environment variables
 export PROVIDER_1_API_KEY=sk-your-key
 export GITHUB_ISSUE_TITLE="Test Ebook"
+export GITHUB_ISSUE_BODY="mode: test\n..."
+export GITHUB_RUN_ID=local_test
 
 # Run generator
 python src/generator.py
 ```
 
-## Understanding Output
-
-### run_report.json
-```json
-{
-  "status": "completed",
-  "mode": "test",
-  "execution": {
-    "agents_executed": ["memory_agent", "task_planner_agent", ...],
-    "agents_failed": []
-  },
-  "summary": {
-    "total_tokens_used": 1500,
-    "total_cost_usd": 0.015
-  }
-}
-```
-
-### cost_report.json
-```json
-{
-  "total_tokens": 1500,
-  "total_cost_usd": 0.015,
-  "limits": {
-    "max_tokens_per_run": 100000,
-    "max_cost_per_run": 0.50
-  }
-}
-```
-
 ## Troubleshooting
 
-### Issue not triggering
-- Check label spelling: `generate-ebook` atau `agent-run`
-- Check workflow conditions
+### Issue tidak memicu workflow
+- Pastikan label sudah ditambahkan: `generate-ebook` atau `agent-run`
+- Cek spelling label dengan tepat
 
-### No API provider
-- Verify secrets are set
-- Check secret names match `PROVIDER_X_API_KEY`
+### Provider tidak tersedia
+- Verifikasi secrets sudah benar
+- Pastikan nama secret sesuai: `PROVIDER_1_API_KEY`, dll
 
-### Cost exceeded
-- Check cost_limits.json
-- Reduce chapter count
-- Use test mode
+### Biaya melebihi budget
+- Cek cost_limits.json untuk limit
+- Gunakan mode test untuk percobaan
+- Kurangi jumlah bab
 
-### Invalid JSON output
-- Check logging for errors
-- Validate output manually
-- Check Python syntax
+### Output JSON invalid
+- Cek logging untuk error details
+- Validasi struktur JSON
+- Periksa apakah file terpotong
+
+## Batasan
+
+- Tidak ada klaim gratis tanpa limit
+- Semua API memiliki kuota masing-masing
+- Biaya dihitung berdasarkan penggunaan token
+- Mode full memerlukan approval eksplisit

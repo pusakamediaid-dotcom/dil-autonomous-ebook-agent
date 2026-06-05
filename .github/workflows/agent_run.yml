@@ -6,16 +6,18 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Execution mode (planning/test/production)'
-        required: false
+        description: 'Execution mode'
+        required: true
         default: 'test'
         type: choice
         options:
           - planning
           - test
-          - production
+          - session
+          - review
+          - repair
       ebook_title:
-        description: 'Ebook title override'
+        description: 'Ebook title'
         required: false
         type: string
       target_audience:
@@ -27,21 +29,34 @@ on:
         required: false
         type: string
         default: 'intermediate'
+      total_chapters:
+        description: 'Number of chapters'
+        required: false
+        type: string
+        default: '1'
+      approval:
+        description: 'Approval given'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   generate-ebook:
     name: Generate Ebook
     runs-on: ubuntu-latest
     
-    # Only run when issue has specific labels
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue && contains(github.event.issue.labels.*.name, 'agent-run')) ||
-      (github.event.issue && contains(github.event.issue.labels.*.name, 'generate-ebook'))
+      (github.event.issue && (
+        contains(github.event.issue.labels.*.name, 'agent-run') ||
+        contains(github.event.issue.labels.*.name, 'generate-ebook')
+      ))
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -63,17 +78,16 @@ jobs:
             pip install -r requirements.txt
           fi
       
-      - name: Set up environment variables from GitHub Secrets
-        env:
-          GITHUB_RUN_ID: ${{ github.run_id }}
-          GITHUB_ISSUE_NUMBER: ${{ github.event.issue.number || '' }}
-          GITHUB_ISSUE_TITLE: ${{ github.event.issue.title || inputs.ebook_title || '' }}
-          GITHUB_ISSUE_BODY: ${{ github.event.issue.body || '' }}
-          PROVIDER_1_API_KEY: ${{ secrets.PROVIDER_1_API_KEY }}
-          PROVIDER_2_API_KEY: ${{ secrets.PROVIDER_2_API_KEY }}
-          PROVIDER_3_API_KEY: ${{ secrets.PROVIDER_3_API_KEY }}
-          PROVIDER_4_API_KEY: ${{ secrets.PROVIDER_4_API_KEY }}
-          PROVIDER_5_API_KEY: ${{ secrets.PROVIDER_5_API_KEY }}
+      - name: Validate Python syntax
+        run: |
+          echo "=== Validating Python files ==="
+          python -m py_compile src/core/*.py src/agents/*.py src/validators/*.py src/generator.py
+          if [ $? -eq 0 ]; then
+            echo "All Python files valid"
+          else
+            echo "Python validation failed"
+            exit 1
+          fi
       
       - name: Run Ebook Generator
         run: |
@@ -92,109 +106,47 @@ jobs:
       - name: Display output files
         run: |
           echo "=== Generated Output Files ==="
-          find output -type f -name "*.md" -o -name "*.json" | head -20
+          find output -type f 2>/dev/null | head -20 || echo "No output files found"
       
-      - name: Upload task plan artifact
+      - name: Upload all artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: task-plan
-          path: output/task_plan.json
+          name: ebook-output
+          path: output/
           retention-days: 30
       
-      - name: Upload outline artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: outline
-          path: output/outline.json
-          retention-days: 30
-      
-      - name: Upload ebook artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ebook
-          path: output/ebook.md
-          retention-days: 30
-      
-      - name: Upload run report artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: run-report
-          path: output/run_report.json
-          retention-days: 30
-      
-      - name: Upload cost report artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: cost-report
-          path: output/cost_report.json
-          retention-days: 30
-      
-      - name: Upload error log artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: error-log
-          path: output/error_log.txt
-          retention-days: 30
-      
-      - name: Upload memory context artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: memory-context
-          path: output/memory_context.json
-          retention-days: 30
-      
-      - name: Upload routing decision artifact
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: routing-decision
-          path: output/routing_decision.json
-          retention-days: 30
-      
-      - name: Add comment to issue
+      - name: Create GitHub Issue Comment
         if: github.event_name == 'issues'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const runReport = JSON.parse(fs.readFileSync('output/run_report.json', 'utf8'));
+        run: |
+          echo "=== Creating Issue Comment ==="
+          
+          # Check if run_report.json exists
+          if [ -f output/run_report.json ]; then
+            STATUS=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('status', 'UNKNOWN'))")
+            MODE=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('mode', 'UNKNOWN'))")
+            AGENTS=$(python3 -c "import json; r=json.load(open('output/run_report.json')); print(len(r.get('execution', {}).get('agents_executed', [])))")
+            FAILED=$(python3 -c "import json; r=json.load(open('output/run_report.json')); print(len(r.get('execution', {}).get('agents_failed', [])))")
+            COST=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('summary', {}).get('total_cost_usd', 0))")
             
-            const comment = `
-            ## 📚 Ebook Generation Complete
-            
-            **Status:** ${runReport.status}
-            **Mode:** ${runReport.mode}
-            **Issue:** #${runReport.issue_number}
-            
-            ### Execution Summary
-            - Agents Executed: ${runReport.execution.agents_executed.length}
-            - Agents Failed: ${runReport.execution.agents_failed.length}
-            
-            ### Cost Summary
-            - Total Tokens: ${runReport.summary.total_tokens_used}
-            - Total Cost: $${runReport.summary.total_cost_usd}
-            
-            ### Artifacts
-            - 📄 [ebook.md](artifact:ebook)
-            - 📋 [task_plan.json](artifact:task-plan)
-            - 📑 [outline.json](artifact:outline)
-            - 📊 [run_report.json](artifact:run-report)
-            - 💰 [cost_report.json](artifact:cost-report)
-            
-            *Generated at: ${runReport.generated_at}*
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-          result-encoding: string
+            COMMENT="Ebook generation completed.
+
+Status: ${STATUS}
+Mode: ${MODE}
+Agents executed: ${AGENTS}
+Agents failed: ${FAILED}
+Total cost: $${COST}
+
+Artifacts available in Actions run."
+          else
+            COMMENT="Ebook generation failed or no output produced. Check Actions logs for details."
+          fi
+          
+          echo "${COMMENT}" > comment.txt
+          
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
+            -d "{\"body\": \"$(cat comment.txt)\"}"
+        shell: bash

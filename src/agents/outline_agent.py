@@ -1,7 +1,7 @@
 """
 DIL Autonomous Ebook Agent - Outline Agent
 
-Generates structured ebook outlines based on task plans.
+Menghasilkan outline ebook terstruktur berdasarkan task plans.
 """
 
 import json
@@ -17,12 +17,12 @@ logger = get_logger(__name__)
 
 class OutlineAgent:
     """
-    Agent that generates detailed ebook outlines.
-    Creates structured chapter/section/subsection layouts.
+    Agent yang menghasilkan outline ebook detail.
+    Membuat struktur bab/section/subsection yang rapi.
     """
     
     def __init__(self):
-        """Initialize OutlineAgent."""
+        """Inisialisasi OutlineAgent."""
         self.output_dir = Path("output")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -30,23 +30,23 @@ class OutlineAgent:
     
     def load_task_plan(self, plan_file: str = "output/task_plan.json") -> Dict[str, Any]:
         """
-        Load task plan from file.
+        Memuat task plan dari file.
         
         Args:
-            plan_file: Path to task plan JSON.
+            plan_file: Path ke task plan JSON.
         
         Returns:
-            Task plan dictionary.
+            Dictionary task plan.
         """
         plan_path = Path(plan_file)
         
         try:
             with open(plan_path, 'r', encoding='utf-8') as f:
                 plan = json.load(f)
-                logger.info(f"Loaded task plan from {plan_path}")
+                logger.info(f"Loaded task plan dari {plan_path}")
                 return plan
         except FileNotFoundError:
-            logger.warning(f"Task plan not found: {plan_path}")
+            logger.warning(f"Task plan tidak ditemukan: {plan_path}")
             return {}
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing task plan: {e}")
@@ -58,51 +58,44 @@ class OutlineAgent:
         mode: str = "test"
     ) -> Dict[str, Any]:
         """
-        Generate detailed outline for a single chapter.
+        Menghasilkan outline detail untuk satu bab.
         
         Args:
-            chapter_config: Chapter configuration from task plan.
-            mode: Execution mode.
+            chapter_config: Konfigurasi bab dari task plan.
+            mode: Mode eksekusi.
         
         Returns:
-            Detailed chapter outline.
+            Outline bab detail.
         """
         chapter_number = chapter_config.get("number", 1)
-        chapter_title = chapter_config.get("title", f"Chapter {chapter_number}")
+        chapter_title = chapter_config.get("title", f"Bab {chapter_number}")
         subtopics = chapter_config.get("subtopics", [])
         
-        # In test mode, limit sections
+        # Sesuaikan jumlah subbab berdasarkan mode
         if mode == "test":
-            subtopics = subtopics[:2]
+            subtopics = subtopics[:2]  # Test: hanya 2 subbab
+        elif mode == "session":
+            subtopics = subtopics[:4]  # Session: maksimal 4 subbab
+        elif mode == "full":
+            subtopics = subtopics[:6]  # Full: maksimal 6 subbab
         
         sections = []
         
         for i, subtopic in enumerate(subtopics, 1):
-            # Create subsections for each subtopic
-            subsections = [
-                {
-                    "title": f"Pengertian {subtopic}",
-                    "content_type": "konseptual",
-                    "key_concepts": [subtopic, "definisi", "konsep dasar"],
-                    "estimated_words": 200
-                },
-                {
-                    "title": f"Contoh {subtopic}",
-                    "content_type": "praktikal",
-                    "key_concepts": ["contoh", "ilustrasi", "studi kasus"],
-                    "estimated_words": 250
-                },
-                {
-                    "title": f"Aplikasi {subtopic}",
-                    "content_type": "praktikal",
-                    "key_concepts": ["implementasi", "penerapan", "praktik"],
-                    "estimated_words": 200
-                }
-            ]
+            subtopic_number = f"{chapter_number}.{i}"
             
-            # In test mode, reduce subsections
-            if mode == "test":
-                subsections = subsections[:2]
+            # Buat subsections untuk setiap subtopic
+            subsections = []
+            
+            required_layers = ["KONSEP", "ANALOGI", "RUMUS", "CONTOH", "APLIKASI"]
+            
+            subsections.append({
+                "subtopic_number": subtopic_number,
+                "subtopic_title": subtopic,
+                "required_layers": required_layers,
+                "visual_placeholder": "[Diagram placeholder]",
+                "estimated_words": 300 if mode == "test" else 500
+            })
             
             section = {
                 "title": subtopic,
@@ -114,19 +107,37 @@ class OutlineAgent:
         
         # Estimate total words
         total_words = sum(
-            sum(s.get("estimated_words", 200) for s in section.get("subsections", []))
+            sum(s.get("estimated_words", 300) for s in section.get("subsections", []))
             for section in sections
         )
         
         chapter_outline = {
-            "number": chapter_number,
-            "title": chapter_title,
+            "chapter_number": chapter_number,
+            "chapter_title": chapter_title,
             "description": chapter_config.get("description", ""),
+            "learning_objectives": self._generate_learning_objectives(chapter_title, subtopics),
             "sections": sections,
             "estimated_words": total_words
         }
         
         return chapter_outline
+    
+    def _generate_learning_objectives(self, title: str, subtopics: List[str]) -> List[str]:
+        """
+        Menghasilkan learning objectives untuk bab.
+        
+        Args:
+            title: Judul bab.
+            subtopics: List subtopic.
+        
+        Returns:
+            List learning objectives.
+        """
+        objectives = [
+            f"Memahami konsep dasar {title}",
+            f"Mampu menjelaskan {', '.join(subtopics[:2])}"
+        ]
+        return objectives
     
     def generate_outline(
         self,
@@ -134,20 +145,29 @@ class OutlineAgent:
         mode: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Generate complete outline from task plan.
+        Menghasilkan outline lengkap dari task plan.
         
         Args:
-            task_plan: Task plan dictionary.
-            mode: Execution mode (defaults to task plan mode).
+            task_plan: Dictionary task plan.
+            mode: Mode eksekusi (default ke task plan mode).
         
         Returns:
-            Complete outline dictionary.
+            Dictionary outline lengkap.
         """
         ebook_title = task_plan.get("ebook_title", "Untitled Ebook")
         chapters_config = task_plan.get("chapters", [])
         execution_mode = mode or task_plan.get("mode", "test")
         
-        logger.info(f"Generating outline for '{ebook_title}', mode={execution_mode}")
+        logger.info(f"Generating outline untuk '{ebook_title}', mode={execution_mode}")
+        
+        # Sesuaikan jumlah bab berdasarkan mode
+        if execution_mode == "test":
+            chapters_config = chapters_config[:1]  # Test: 1 bab
+        elif execution_mode == "session":
+            chapters_config = chapters_config[:4]  # Session: max 4 bab
+        elif execution_mode == "full":
+            # Full: boleh lebih banyak bab
+            pass
         
         chapter_outlines = []
         
@@ -155,24 +175,46 @@ class OutlineAgent:
             outline = self.generate_chapter_outline(chapter_config, execution_mode)
             chapter_outlines.append(outline)
         
-        outline = create_outline(ebook_title, chapter_outlines)
+        # Build outline dengan schema lengkap
+        total_sections = sum(len(c.get("sections", [])) for c in chapter_outlines)
+        total_subsections = sum(
+            sum(len(s.get("subsections", [])) for s in c.get("sections", []))
+            for c in chapter_outlines
+        )
+        total_words = sum(c.get("estimated_words", 0) for c in chapter_outlines)
+        
+        outline = {
+            "schema_version": "1.1",
+            "ebook_title": ebook_title,
+            "target_audience": task_plan.get("target_audience", ""),
+            "reading_level": task_plan.get("reading_level", "intermediate"),
+            "mode": execution_mode,
+            "total_chapters": len(chapter_outlines),
+            "chapters": chapter_outlines,
+            "metadata": {
+                "total_chapters": len(chapter_outlines),
+                "total_sections": total_sections,
+                "total_subsections": total_subsections,
+                "total_estimated_words": total_words
+            }
+        }
         
         self.outline = outline
-        logger.info(f"Outline generated: {len(chapter_outlines)} chapters")
+        logger.info(f"Outline generated: {len(chapter_outlines)} chapters, {total_subsections} subsections")
         
         return outline
     
     def validate_outline(self) -> tuple[bool, List[str]]:
         """
-        Validate the generated outline.
+        Memvalidasi outline yang dihasilkan.
         
         Returns:
-            Tuple of (is_valid, list of errors).
+            Tuple (is_valid, list errors).
         """
         errors = []
         
         if not self.outline:
-            errors.append("Outline is empty")
+            errors.append("Outline kosong")
             return False, errors
         
         if "ebook_title" not in self.outline:
@@ -181,28 +223,35 @@ class OutlineAgent:
         if "chapters" not in self.outline:
             errors.append("Missing chapters")
         elif not isinstance(self.outline["chapters"], list):
-            errors.append("Chapters must be a list")
+            errors.append("Chapters harus berupa list")
         elif len(self.outline["chapters"]) == 0:
-            errors.append("At least one chapter required")
+            errors.append("Minimal harus ada 1 bab")
         
-        # Validate each chapter
+        # Validasi setiap bab
         for i, chapter in enumerate(self.outline.get("chapters", [])):
-            if "title" not in chapter:
-                errors.append(f"Chapter {i+1} missing title")
+            if "chapter_title" not in chapter:
+                errors.append(f"Bab {i+1} missing chapter_title")
             if "sections" not in chapter:
-                errors.append(f"Chapter {i+1} missing sections")
+                errors.append(f"Bab {i+1} missing sections")
+            
+            # Validasi subsections
+            for j, section in enumerate(chapter.get("sections", [])):
+                for k, subsection in enumerate(section.get("subsections", [])):
+                    required = subsection.get("required_layers", [])
+                    if len(required) != 5:
+                        errors.append(f"Bab {i+1}, Section {j+1}, Subsection {k+1}: harus punya 5 lapisan")
         
         return len(errors) == 0, errors
     
     def save_outline(self, output_file: str = "output/outline.json") -> None:
         """
-        Save outline to JSON file.
+        Menyimpan outline ke file JSON.
         
         Args:
-            output_file: Output file path.
+            output_file: Path file output.
         """
         if not self.outline:
-            logger.warning("No outline to save - run generate_outline first")
+            logger.warning("Tidak ada outline untuk disimpan - jalankan generate_outline terlebih dahulu")
             return
         
         output_path = Path(output_file)
@@ -211,41 +260,50 @@ class OutlineAgent:
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(self.outline, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Outline saved to {output_path}")
+        logger.info(f"Outline disimpan ke {output_path}")
     
     def execute(self, run_context: RunContext) -> Dict[str, Any]:
         """
-        Execute outline agent.
+        Menjalankan outline agent.
         
         Args:
-            run_context: Current run context.
+            run_context: Run context saat ini.
         
         Returns:
-            Outline dictionary.
+            Dictionary outline.
         """
         logger.info("OutlineAgent executing...")
         
-        # Load task plan
+        # Muat task plan
         task_plan = self.load_task_plan()
         
         if not task_plan:
-            logger.error("No task plan available - cannot generate outline")
-            # Create minimal outline from run context
+            logger.error("Tidak ada task plan tersedia - tidak bisa generate outline")
+            # Buat outline minimal dari run context
             task_plan = {
-                "ebook_title": run_context.ebook_title,
-                "chapters": [{"number": 1, "title": f"Pengenalan {run_context.ebook_title}"}],
-                "mode": run_context.mode
+                "ebook_title": run_context.ebook_title or "Untitled Ebook",
+                "target_audience": run_context.target_audience or "General",
+                "reading_level": run_context.reading_level or "intermediate",
+                "mode": run_context.mode or "test",
+                "chapters": [
+                    {
+                        "number": 1,
+                        "title": f"Bab 1 — Pengenalan {run_context.ebook_title or 'Topik'}",
+                        "description": "Pengenalan konsep dasar",
+                        "subtopics": ["Konsep Dasar", "Implementasi"]
+                    }
+                ]
             }
         
         # Generate outline
         outline = self.generate_outline(task_plan)
         
-        # Validate
+        # Validasi
         is_valid, errors = self.validate_outline()
         if not is_valid:
             logger.warning(f"Outline validation errors: {errors}")
         
-        # Save
+        # Simpan
         self.save_outline()
         
         logger.info("OutlineAgent completed")
@@ -255,13 +313,13 @@ class OutlineAgent:
 
 def run_outline_agent(run_context: RunContext) -> Dict[str, Any]:
     """
-    Convenience function to run OutlineAgent.
+    Fungsi convenience untuk menjalankan OutlineAgent.
     
     Args:
-        run_context: Current run context.
+        run_context: Run context saat ini.
     
     Returns:
-        Outline dictionary.
+        Dictionary outline.
     """
     agent = OutlineAgent()
     return agent.execute(run_context)

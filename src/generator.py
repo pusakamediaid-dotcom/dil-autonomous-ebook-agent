@@ -1,8 +1,8 @@
 """
 DIL Autonomous Ebook Agent - Generator (MVP)
 
-Main entry point for ebook generation workflow.
-Orchestrates all agents and generates final artifacts.
+Entry point utama untuk workflow generasi ebook.
+Mengorkestrasi semua agent dan menghasilkan output final.
 """
 
 import sys
@@ -10,45 +10,54 @@ import json
 from pathlib import Path
 from typing import Dict, Any, List
 
-# Determine package root
-PACKAGE_ROOT = Path(__file__).parent
-sys.path.insert(0, str(PACKAGE_ROOT))
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent))
 
-# Import from core package
 from core.logger import get_logger
 from core.run_context import create_run_context_from_issue
 from core.cost_guard import CostGuard
 from core.report_builder import ReportBuilder
 
-# Import from agents package
 from agents.memory_agent import run_memory_agent
 from agents.task_planner_agent import run_task_planner
 from agents.router_agent import run_router_agent
 from agents.outline_agent import run_outline_agent
 from agents.writer_agent import run_writer_agent
+from agents.reviewer_agent import run_reviewer_agent
+from agents.repair_agent import run_repair_agent
+
+from validators.json_validator import validate_json_file
+from validators.markdown_validator import validate_markdown_file
+from validators.output_validator import validate_outputs
+from validators.safety_validator import check_file_safety
 
 logger = get_logger(__name__)
 
 
 class EbookGenerator:
     """
-    Main generator class that orchestrates the ebook generation workflow.
+    Generator utama yang mengorkestrasi workflow generasi ebook.
     
-    Flow:
-    1. Create RunContext
+    Alur:
+    1. Setup RunContext
     2. Run MemoryAgent
     3. Run TaskPlannerAgent
-    4. If mode=planning, create report and finish
-    5. Run RouterAgent
-    6. Run CostGuard
-    7. Run OutlineAgent
-    8. Run WriterAgent
-    9. Create run_report.json
-    10. Create cost_report.json
+    4. If mode planning -> selesai
+    5. Cek approval gate
+    6. Run RouterAgent
+    7. Run CostGuard
+    8. Run OutlineAgent
+    9. Validate outline.json
+    10. Run WriterAgent
+    11. Validate ebook.md
+    12. Run ReviewerAgent
+    13. If status REPAIR -> Run RepairAgent (max 2 iterasi)
+    14. Run OutputValidator
+    15. Create reports
     """
     
     def __init__(self):
-        """Initialize EbookGenerator."""
+        """Inisialisasi EbookGenerator."""
         self.run_context = None
         self.cost_guard = None
         self.report_builder = None
@@ -62,8 +71,8 @@ class EbookGenerator:
         logger.info("EbookGenerator initialized")
     
     def setup(self) -> None:
-        """Setup generator components."""
-        # Create run context from environment
+        """Setup komponen generator."""
+        # Buat run context dari environment
         self.run_context = create_run_context_from_issue()
         logger.info(f"RunContext created: mode={self.run_context.mode}")
         
@@ -75,13 +84,30 @@ class EbookGenerator:
         self.report_builder = ReportBuilder()
         logger.info("ReportBuilder initialized")
     
-    def run_memory_phase(self) -> Dict[str, Any]:
+    def validate_approval_gate(self) -> bool:
         """
-        Run memory agent phase.
+        Memvalidasi approval untuk mode besar.
         
         Returns:
-            Memory context dictionary.
+            True jika approved atau mode kecil.
         """
+        mode = self.run_context.mode
+        
+        # Modes kecil tidak butuh approval
+        if mode in ["planning", "test", "session", "review", "repair"]:
+            return True
+        
+        # Modes besar butuh approval
+        if mode in ["full", "html", "pdf"]:
+            if not self.run_context.approval_given:
+                logger.error(f"Mode {mode} memerlukan approval. Pipeline berhenti.")
+                return False
+            return True
+        
+        return True
+    
+    def run_memory_phase(self) -> Dict[str, Any]:
+        """Fase memory agent."""
         logger.info("=== MEMORY PHASE ===")
         
         try:
@@ -97,12 +123,7 @@ class EbookGenerator:
             return {}
     
     def run_planning_phase(self) -> Dict[str, Any]:
-        """
-        Run task planner phase.
-        
-        Returns:
-            Task plan dictionary.
-        """
+        """Fase task planner."""
         logger.info("=== PLANNING PHASE ===")
         
         try:
@@ -118,12 +139,7 @@ class EbookGenerator:
             return {}
     
     def run_routing_phase(self) -> Dict[str, Any]:
-        """
-        Run router agent phase.
-        
-        Returns:
-            Routing decision dictionary.
-        """
+        """Fase router agent."""
         logger.info("=== ROUTING PHASE ===")
         
         try:
@@ -146,12 +162,7 @@ class EbookGenerator:
             return {"status": "failed", "reason": str(e)}
     
     def run_outline_phase(self) -> Dict[str, Any]:
-        """
-        Run outline agent phase.
-        
-        Returns:
-            Outline dictionary.
-        """
+        """Fase outline agent."""
         logger.info("=== OUTLINE PHASE ===")
         
         try:
@@ -166,13 +177,27 @@ class EbookGenerator:
             self.run_context.mark_agent_failed("outline_agent")
             return {}
     
-    def run_writing_phase(self) -> str:
-        """
-        Run writer agent phase.
+    def validate_outline(self) -> bool:
+        """Validasi outline.json."""
+        logger.info("=== VALIDATING OUTLINE ===")
         
-        Returns:
-            Ebook content string.
-        """
+        outline_path = self.output_dir / "outline.json"
+        
+        if not outline_path.exists():
+            logger.error("outline.json tidak ditemukan")
+            return False
+        
+        is_valid, errors = validate_json_file(str(outline_path))
+        
+        if not is_valid:
+            logger.error(f"Outline validation failed: {errors}")
+            return False
+        
+        logger.info("Outline validation passed")
+        return True
+    
+    def run_writing_phase(self) -> str:
+        """Fase writer agent."""
         logger.info("=== WRITING PHASE ===")
         
         try:
@@ -181,8 +206,8 @@ class EbookGenerator:
             self.run_context.mark_agent_done("writer_agent")
             
             # Estimate words written
-            word_count = len(content.split())
-            estimated_tokens = word_count * 1  # Approx tokens
+            word_count = len(content.split()) if content else 0
+            estimated_tokens = word_count * 1
             estimated_cost = self.cost_guard.estimate_cost(
                 estimated_tokens,
                 self.run_context.selected_provider or "unknown",
@@ -199,16 +224,84 @@ class EbookGenerator:
             self.run_context.mark_agent_failed("writer_agent")
             return ""
     
+    def validate_ebook(self) -> bool:
+        """Validasi ebook.md."""
+        logger.info("=== VALIDATING EBOOK ===")
+        
+        ebook_path = self.output_dir / "ebook.md"
+        
+        if not ebook_path.exists():
+            logger.error("ebook.md tidak ditemukan")
+            return False
+        
+        # Validasi format markdown
+        result = validate_markdown_file(str(ebook_path))
+        
+        if not result.get("is_valid", False):
+            logger.warning(f"Ebook validation issues: {result.get('errors', [])}")
+        
+        # Cek safety
+        safety_result = check_file_safety(str(ebook_path))
+        
+        if not safety_result.get("is_safe", True):
+            logger.error(f"Safety check failed: {safety_result.get('findings', [])}")
+            return False
+        
+        logger.info("Ebook validation completed")
+        return True
+    
+    def run_review_phase(self) -> Dict[str, Any]:
+        """Fase reviewer agent."""
+        logger.info("=== REVIEW PHASE ===")
+        
+        try:
+            review_result = run_reviewer_agent()
+            self.agents_executed.append("reviewer_agent")
+            self.run_context.mark_agent_done("reviewer_agent")
+            
+            logger.info(f"Review result: {review_result.get('status')}, score: {review_result.get('score')}")
+            
+            return review_result
+        except Exception as e:
+            logger.error(f"Review phase failed: {e}")
+            self.agents_failed.append("reviewer_agent")
+            self.run_context.mark_agent_failed("reviewer_agent")
+            return {"status": "ERROR", "score": 0}
+    
+    def run_repair_if_needed(self, review_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Fase repair agent jika diperlukan."""
+        logger.info("=== REPAIR PHASE (if needed) ===")
+        
+        if review_result.get("status") != "REPAIR":
+            logger.info("Repair tidak diperlukan")
+            return {"status": "SKIPPED"}
+        
+        if review_result.get("secret_leak_detected"):
+            logger.error("Secret leak - repair tidak dapat dilakukan")
+            return {"status": "REJECTED"}
+        
+        try:
+            repair_result = run_repair_agent()
+            self.agents_executed.append("repair_agent")
+            self.run_context.mark_agent_done("repair_agent")
+            
+            logger.info(f"Repair result: {repair_result.get('status')}")
+            
+            return repair_result
+        except Exception as e:
+            logger.error(f"Repair phase failed: {e}")
+            self.agents_failed.append("repair_agent")
+            self.run_context.mark_agent_failed("repair_agent")
+            return {"status": "ERROR"}
+    
     def finalize(self) -> None:
-        """
-        Finalize run - create reports and artifacts.
-        """
+        """Finalisasi run - buat reports dan artifacts."""
         logger.info("=== FINALIZATION PHASE ===")
         
-        # Mark run as finalized
+        # Mark run sebagai finalized
         self.run_context.finalize()
         
-        # Build and save run report
+        # Build dan save run report
         output_files = self._get_output_files()
         
         run_report = self.report_builder.build_run_report(
@@ -220,7 +313,7 @@ class EbookGenerator:
         
         self.report_builder.save_run_report(run_report)
         
-        # Build and save cost report
+        # Build dan save cost report
         cost_report = self.report_builder.build_cost_report(self.cost_guard)
         self.report_builder.save_cost_report(cost_report)
         
@@ -235,12 +328,7 @@ class EbookGenerator:
         logger.info(f"Total cost: ${self.run_context.total_usd_spent:.6f}")
     
     def _get_output_files(self) -> List[str]:
-        """
-        Get list of generated output files.
-        
-        Returns:
-            List of file paths.
-        """
+        """Mendapatkan list file output yang ada."""
         files = [
             "output/task_plan.json",
             "output/outline.json",
@@ -249,12 +337,11 @@ class EbookGenerator:
             "output/cost_report.json",
             "output/memory_context.json",
             "output/routing_decision.json",
-            "output/run_context.json"
+            "output/review_report.json",
+            "output/ebook_repaired.md"
         ]
         
-        # Only include existing files
         existing = [f for f in files if Path(f).exists()]
-        
         return existing
     
     def run(self) -> Dict[str, Any]:
@@ -262,7 +349,7 @@ class EbookGenerator:
         Execute complete generation workflow.
         
         Returns:
-            Result dictionary with status and artifacts.
+            Result dictionary dengan status dan artifacts.
         """
         logger.info("=" * 50)
         logger.info("DIL AUTONOMOUS EBOOK AGENT - STARTING")
@@ -271,39 +358,69 @@ class EbookGenerator:
         # Setup
         self.setup()
         
-        # Memory phase (always)
+        # Memory phase (selalu)
         self.run_memory_phase()
         
-        # Planning phase (always)
+        # Planning phase (selalu)
         plan = self.run_planning_phase()
         
-        # Check if mode is planning - if so, stop after planning
+        # Cek mode planning - jika ya, selesai di sini
         if self.run_context.mode == "planning":
             logger.info("Mode is 'planning' - stopping after task plan")
             self.finalize()
             return {
-                "status": "success",
+                "status": "SUCCESS",
                 "mode": "planning",
-                "artifacts": ["output/task_plan.json"]
+                "artifacts": ["output/task_plan.json", "output/memory_context.json"]
+            }
+        
+        # Cek approval gate
+        if not self.validate_approval_gate():
+            self.finalize()
+            return {
+                "status": "FAILED",
+                "reason": "Approval diperlukan untuk mode ini",
+                "phase": "approval_gate"
             }
         
         # Routing phase
         routing = self.run_routing_phase()
         
         if routing.get("status") == "failed":
-            logger.error("Routing failed - cannot proceed")
+            logger.error("Routing failed - tidak bisa lanjut")
             self.finalize()
             return {
-                "status": "failed",
-                "reason": "No API provider available",
+                "status": "FAILED",
+                "reason": "Tidak ada API provider tersedia",
                 "phase": "routing"
             }
         
         # Outline phase
         outline = self.run_outline_phase()
         
+        # Validasi outline
+        if not self.validate_outline():
+            logger.warning("Outline validation failed - melanjutkan dengan warning")
+        
         # Writing phase
         content = self.run_writing_phase()
+        
+        if not content:
+            logger.error("Writing phase menghasilkan konten kosong")
+        
+        # Validasi ebook
+        if not self.validate_ebook():
+            logger.warning("Ebook validation issues - melanjutkan dengan warning")
+        
+        # Review phase
+        review_result = self.run_review_phase()
+        
+        # Repair phase jika diperlukan
+        if review_result.get("status") == "REPAIR":
+            repair_result = self.run_repair_if_needed(review_result)
+            
+            if repair_result.get("status") == "COMPLETED":
+                logger.info("Repair completed successfully")
         
         # Finalize
         self.finalize()
@@ -312,11 +429,21 @@ class EbookGenerator:
         logger.info("DIL AUTONOMOUS EBOOK AGENT - COMPLETED")
         logger.info("=" * 50)
         
+        # Tentukan status akhir
+        if len(self.agents_failed) == 0:
+            final_status = "SUCCESS"
+        elif review_result.get("status") in ["PASS", "REPAIR"]:
+            final_status = "PARTIAL_SUCCESS"
+        else:
+            final_status = "FAILED"
+        
         return {
-            "status": "success" if len(self.agents_failed) == 0 else "completed_with_errors",
+            "status": final_status,
             "mode": self.run_context.mode,
             "agents_executed": self.agents_executed,
             "agents_failed": self.agents_failed,
+            "review_status": review_result.get("status"),
+            "review_score": review_result.get("score"),
             "total_tokens": self.run_context.total_tokens_used,
             "total_cost_usd": round(self.run_context.total_usd_spent, 6),
             "artifacts": self._get_output_files()
@@ -336,13 +463,14 @@ def main():
         print(f"Mode: {result.get('mode')}")
         print(f"Agents executed: {result.get('agents_executed', [])}")
         print(f"Agents failed: {result.get('agents_failed', [])}")
+        print(f"Review: {result.get('review_status')} ({result.get('review_score')})")
         print(f"Total tokens: {result.get('total_tokens', 0)}")
         print(f"Total cost: ${result.get('total_cost_usd', 0):.6f}")
         print(f"Artifacts: {result.get('artifacts', [])}")
         print("=" * 50)
         
         # Exit with appropriate code
-        sys.exit(0 if result.get('status') == 'success' else 1)
+        sys.exit(0 if result.get('status') == 'SUCCESS' else 1)
         
     except Exception as e:
         logger.error(f"Fatal error: {e}")

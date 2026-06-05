@@ -1,181 +1,165 @@
 {
-  "schema_version": "1.0",
-  "description": "Model pool configuration for DIL Ebook Agent",
+  "schema_version": "1.1",
+  "description": "Model pool configuration for DIL Autonomous Ebook Agent",
   "providers": [
     {
       "id": "provider_1",
-      "name": "OpenAI",
-      "api_endpoint": "https://api.openai.com/v1",
-      "priority": 1,
+      "provider_name": "OpenAI",
+      "env_secret_name": "PROVIDER_1_API_KEY",
+      "sdk_type": "openai",
+      "base_url": "https://api.openai.com/v1",
       "models": [
-        {
-          "id": "gpt-4o",
-          "name": "GPT-4 Omni",
-          "cost_input_per_1k": 0.005,
-          "cost_output_per_1k": 0.015,
-          "max_tokens": 128000,
-          "context_window": 128000,
-          "supports_functions": true
-        },
         {
           "id": "gpt-4o-mini",
           "name": "GPT-4 Omni Mini",
+          "tier": "fast",
           "cost_input_per_1k": 0.00015,
           "cost_output_per_1k": 0.0006,
           "max_tokens": 128000,
-          "context_window": 128000,
-          "supports_functions": true
+          "context_window": 128000
+        },
+        {
+          "id": "gpt-4o",
+          "name": "GPT-4 Omni",
+          "tier": "strong",
+          "cost_input_per_1k": 0.005,
+          "cost_output_per_1k": 0.015,
+          "max_tokens": 128000,
+          "context_window": 128000
         },
         {
           "id": "gpt-4-turbo",
           "name": "GPT-4 Turbo",
+          "tier": "strong",
           "cost_input_per_1k": 0.01,
           "cost_output_per_1k": 0.03,
           "max_tokens": 128000,
-          "context_window": 128000,
-          "supports_functions": true
-        },
-        {
-          "id": "gpt-3.5-turbo",
-          "name": "GPT-3.5 Turbo",
-          "cost_input_per_1k": 0.0005,
-          "cost_output_per_1k": 0.0015,
-          "max_tokens": 16385,
-          "context_window": 16385,
-          "supports_functions": true
+          "context_window": 128000
         }
-      ]
+      ],
+      "model_fast": "gpt-4o-mini",
+      "model_strong": "gpt-4o",
+      "priority": 1
     },
     {
       "id": "provider_2",
-      "name": "Anthropic",
-      "api_endpoint": "https://api.anthropic.com/v1",
-      "priority": 2,
+      "provider_name": "Gemini 1",
+      "env_secret_name": "PROVIDER_2_API_KEY",
+      "sdk_type": "google-genai",
+      "base_url": "",
       "models": [
-        {
-          "id": "claude-3-5-sonnet",
-          "name": "Claude 3.5 Sonnet",
-          "cost_input_per_1k": 0.003,
-          "cost_output_per_1k": 0.015,
-          "max_tokens": 200000,
-          "context_window": 200000,
-          "supports_functions": true
-        },
-        {
-          "id": "claude-3-opus",
-          "name": "Claude 3 Opus",
-          "cost_input_per_1k": 0.015,
-          "cost_output_per_1k": 0.075,
-          "max_tokens": 200000,
-          "context_window": 200000,
-          "supports_functions": true
-        },
-        {
-          "id": "claude-3-sonnet",
-          "name": "Claude 3 Sonnet",
-          "cost_input_per_1k": 0.003,
-          "cost_output_per_1k": 0.015,
-          "max_tokens": 200000,
-          "context_window": 200000,
-          "supports_functions": true
-        }
-      ]
-    },
-    {
-      "id": "provider_3",
-      "name": "Google Gemini",
-      "api_endpoint": "https://generativelanguage.googleapis.com/v1beta",
-      "priority": 3,
-      "models": [
-        {
-          "id": "gemini-1.5-pro",
-          "name": "Gemini 1.5 Pro",
-          "cost_input_per_1k": 0.00125,
-          "cost_output_per_1k": 0.005,
-          "max_tokens": 2097152,
-          "context_window": 2000000,
-          "supports_functions": true
-        },
         {
           "id": "gemini-1.5-flash",
           "name": "Gemini 1.5 Flash",
+          "tier": "fast",
           "cost_input_per_1k": 0.000075,
           "cost_output_per_1k": 0.0003,
           "max_tokens": 1048576,
-          "context_window": 1000000,
-          "supports_functions": true
+          "context_window": 1000000
         },
         {
-          "id": "gemini-pro",
-          "name": "Gemini Pro",
+          "id": "gemini-1.5-pro",
+          "name": "Gemini 1.5 Pro",
+          "tier": "strong",
           "cost_input_per_1k": 0.00125,
           "cost_output_per_1k": 0.005,
-          "max_tokens": 32768,
-          "context_window": 32768,
-          "supports_functions": true
+          "max_tokens": 2097152,
+          "context_window": 2000000
         }
-      ]
+      ],
+      "model_fast": "gemini-1.5-flash",
+      "model_strong": "gemini-1.5-pro",
+      "priority": 2
+    },
+    {
+      "id": "provider_3",
+      "provider_name": "Gemini 2",
+      "env_secret_name": "PROVIDER_3_API_KEY",
+      "sdk_type": "google-genai",
+      "base_url": "",
+      "models": [
+        {
+          "id": "gemini-1.5-flash",
+          "name": "Gemini 1.5 Flash",
+          "tier": "fast",
+          "cost_input_per_1k": 0.000075,
+          "cost_output_per_1k": 0.0003,
+          "max_tokens": 1048576,
+          "context_window": 1000000
+        },
+        {
+          "id": "gemini-1.5-pro",
+          "name": "Gemini 1.5 Pro",
+          "tier": "strong",
+          "cost_input_per_1k": 0.00125,
+          "cost_output_per_1k": 0.005,
+          "max_tokens": 2097152,
+          "context_window": 2000000
+        }
+      ],
+      "model_fast": "gemini-1.5-flash",
+      "model_strong": "gemini-1.5-pro",
+      "priority": 3
     },
     {
       "id": "provider_4",
-      "name": "Cohere",
-      "api_endpoint": "https://api.cohere.ai/v1",
-      "priority": 4,
+      "provider_name": "Gemini 3",
+      "env_secret_name": "PROVIDER_4_API_KEY",
+      "sdk_type": "google-genai",
+      "base_url": "",
       "models": [
         {
-          "id": "command-r-plus",
-          "name": "Command R+",
-          "cost_input_per_1k": 0.003,
-          "cost_output_per_1k": 0.015,
-          "max_tokens": 128000,
-          "context_window": 128000,
-          "supports_functions": true
+          "id": "gemini-1.5-flash",
+          "name": "Gemini 1.5 Flash",
+          "tier": "fast",
+          "cost_input_per_1k": 0.000075,
+          "cost_output_per_1k": 0.0003,
+          "max_tokens": 1048576,
+          "context_window": 1000000
         },
         {
-          "id": "command-r",
-          "name": "Command R",
-          "cost_input_per_1k": 0.0005,
-          "cost_output_per_1k": 0.0015,
-          "max_tokens": 128000,
-          "context_window": 128000,
-          "supports_functions": true
+          "id": "gemini-1.5-pro",
+          "name": "Gemini 1.5 Pro",
+          "tier": "strong",
+          "cost_input_per_1k": 0.00125,
+          "cost_output_per_1k": 0.005,
+          "max_tokens": 2097152,
+          "context_window": 2000000
         }
-      ]
+      ],
+      "model_fast": "gemini-1.5-flash",
+      "model_strong": "gemini-1.5-pro",
+      "priority": 4
     },
     {
       "id": "provider_5",
-      "name": "Mistral AI",
-      "api_endpoint": "https://api.mistral.ai/v1",
-      "priority": 5,
+      "provider_name": "OpenRouter",
+      "env_secret_name": "PROVIDER_5_API_KEY",
+      "sdk_type": "openai-compatible",
+      "base_url": "https://openrouter.ai/api/v1",
       "models": [
         {
-          "id": "mistral-large",
-          "name": "Mistral Large",
-          "cost_input_per_1k": 0.002,
-          "cost_output_per_1k": 0.006,
+          "id": "openrouter/auto",
+          "name": "OpenRouter Auto",
+          "tier": "fast",
+          "cost_input_per_1k": 0.0,
+          "cost_output_per_1k": 0.0,
           "max_tokens": 128000,
-          "context_window": 128000,
-          "supports_functions": false
+          "context_window": 128000
         },
         {
-          "id": "mistral-medium",
-          "name": "Mistral Medium",
-          "cost_input_per_1k": 0.0008,
-          "cost_output_per_1k": 0.0024,
-          "max_tokens": 32768,
-          "context_window": 32768,
-          "supports_functions": false
-        },
-        {
-          "id": "mixtral-8x7b",
-          "name": "Mixtral 8x7B",
-          "cost_input_per_1k": 0.00024,
-          "cost_output_per_1k": 0.00024,
-          "max_tokens": 32768,
-          "context_window": 32768,
-          "supports_functions": false
+          "id": "openrouter/anthropic/claude-3.5-sonnet",
+          "name": "Claude 3.5 Sonnet via OpenRouter",
+          "tier": "strong",
+          "cost_input_per_1k": 0.003,
+          "cost_output_per_1k": 0.015,
+          "max_tokens": 200000,
+          "context_window": 200000
         }
-      ]
+      ],
+      "model_fast": "openrouter/auto",
+      "model_strong": "openrouter/anthropic/claude-3.5-sonnet",
+      "priority": 5
     }
   ]
 }

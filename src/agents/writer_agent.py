@@ -1,7 +1,8 @@
 """
 DIL Autonomous Ebook Agent - Writer Agent
 
-Generates ebook content based on outline.
+Menghasilkan konten ebook berbasis outline.
+Setiap subbab memiliki Metode 5-Lapis: KONSEP, ANALOGI, RUMUS, CONTOH, APLIKASI.
 """
 
 import json
@@ -11,347 +12,375 @@ from typing import Dict, Any, List, Optional
 
 from core.logger import get_logger
 from core.run_context import RunContext
+from core.api_client import AIClient, get_ai_client
+from core.secret_manager import get_secret_manager
 
 logger = get_logger(__name__)
 
 
 class WriterAgent:
     """
-    Agent that writes ebook content based on outline structure.
-    Each subsection contains: [KONSEP], [ANALOGI], [RUMUS], [CONTOH], [APLIKASI]
+    Agent yang menulis konten ebook berbasis outline.
+    Setiap subsection memiliki 5 lapisan wajib.
     """
     
     def __init__(self):
-        """Initialize WriterAgent."""
+        """Inisialisasi WriterAgent."""
         self.output_dir = Path("output")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         self.outline: Dict[str, Any] = {}
         self.content: List[str] = []
         self.words_written: int = 0
+        self.foreign_text_detected: bool = False
+        self.ai_client: Optional[AIClient] = None
+        self.api_available: bool = False
     
     def load_outline(self, outline_file: str = "output/outline.json") -> Dict[str, Any]:
-        """
-        Load outline from file.
-        
-        Args:
-            outline_file: Path to outline JSON.
-        
-        Returns:
-            Outline dictionary.
-        """
+        """Memuat outline dari file."""
         outline_path = Path(outline_file)
         
         try:
             with open(outline_path, 'r', encoding='utf-8') as f:
                 outline = json.load(f)
-                logger.info(f"Loaded outline from {outline_path}")
+                logger.info(f"Loaded outline dari {outline_path}")
                 self.outline = outline
                 return outline
         except FileNotFoundError:
-            logger.warning(f"Outline not found: {outline_path}")
+            logger.warning(f"Outline tidak ditemukan: {outline_path}")
             return {}
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing outline: {e}")
             return {}
     
-    def sanitize_title(self, title: str) -> str:
-        """
-        Sanitize title for markdown heading.
-        
-        Args:
-            title: Raw title string.
-        
-        Returns:
-            Sanitized title.
-        """
-        # Remove excessive whitespace
-        title = ' '.join(title.split())
-        return title
+    def setup_ai_client(self) -> bool:
+        """Setup AI client dengan provider yang tersedia."""
+        try:
+            self.ai_client = get_ai_client()
+            secret_manager = get_secret_manager()
+            available = secret_manager.get_available_providers()
+            
+            if not available:
+                logger.info("Tidak ada provider API tersedia - menggunakan fallback template")
+                self.api_available = False
+                return False
+            
+            self.api_available = True
+            logger.info(f"AI Client siap dengan {len(available)} provider")
+            return True
+        except Exception as e:
+            logger.error(f"Error setup AI client: {e}")
+            self.api_available = False
+            return False
     
-    def write_section_header(self, title: str, level: int = 2) -> str:
-        """
-        Write a markdown section header.
-        
-        Args:
-            title: Section title.
-            level: Heading level (1-6).
-        
-        Returns:
-            Markdown heading string.
-        """
-        return f"{'#' * level} {self.sanitize_title(title)}\n\n"
+    def write_header(self, ebook_title: str, target_audience: str, reading_level: str, timestamp: str) -> str:
+        """Menulis header ebook."""
+        lines = [
+            f"# {ebook_title}",
+            "",
+            f"**Target Pembaca:** {target_audience}",
+            f"**Level:** {reading_level}",
+            f"**Dibuat:** {timestamp}",
+            "",
+            "---",
+            ""
+        ]
+        return '\n'.join(lines)
     
-    def write_subsection_content(
-        self,
-        subsection: Dict[str, Any],
-        chapter_num: int,
-        section_num: int,
-        subsection_num: int
-    ) -> str:
-        """
-        Write content for a single subsection.
+    def write_toc(self, chapters: List[Dict[str, Any]]) -> str:
+        """Menulis daftar isi."""
+        lines = ["# Daftar Isi", ""]
         
-        Each subsection contains:
-        - [KONSEP] - Conceptual explanation
-        - [ANALOGI] - Analogy for understanding
-        - [RUMUS] - Formula or principle (if applicable)
-        - [CONTOH] - Practical example
-        - [APLIKASI] - Real-world application
+        for chapter in chapters:
+            chapter_num = chapter.get("chapter_number", 0)
+            chapter_title = chapter.get("chapter_title", "")
+            
+            lines.append(f"{chapter_num}. {chapter_title}")
+            
+            for section in chapter.get("sections", []):
+                for subsection in section.get("subsections", []):
+                    sub_num = subsection.get("subtopic_number", "")
+                    sub_title = subsection.get("subtopic_title", "")
+                    lines.append(f"   {sub_num} {sub_title}")
+            
+            lines.append("")
         
-        Args:
-            subsection: Subsection configuration.
-            chapter_num: Chapter number.
-            section_num: Section number.
-            subsection_num: Subsection number.
+        lines.append("---\n")
+        return '\n'.join(lines)
+    
+    def write_chapter_header(self, chapter: Dict[str, Any]) -> str:
+        """Menulis header bab."""
+        chapter_num = chapter.get("chapter_number", 1)
+        chapter_title = chapter.get("chapter_title", "")
+        description = chapter.get("description", "")
+        objectives = chapter.get("learning_objectives", [])
         
-        Returns:
-            Formatted markdown content.
-        """
-        title = subsection.get("title", "Subtopik")
-        content_type = subsection.get("content_type", "konseptual")
-        key_concepts = subsection.get("key_concepts", [])
+        lines = [
+            "",
+            f"## Bab {chapter_num} — {chapter_title}",
+            ""
+        ]
+        
+        if description:
+            lines.append(f"*{description}*")
+            lines.append("")
+        
+        if objectives:
+            lines.append("**Tujuan Pembelajaran:**")
+            for obj in objectives[:3]:
+                lines.append(f"- {obj}")
+            lines.append("")
+        
+        return '\n'.join(lines)
+    
+    def write_subsection_header(self, subsection: Dict[str, Any]) -> str:
+        """Menulis header subbab."""
+        sub_num = subsection.get("subtopic_number", "")
+        sub_title = subsection.get("subtopic_title", "")
+        return f"### {sub_num} {sub_title}\n"
+    
+    def generate_concept_content(self, title: str) -> str:
+        """Menghasilkan konten [KONSEP]."""
+        return f"""#### [KONSEP]
+
+Dalam bagian ini, kita akan membahas secara mendalam tentang **{title}**.
+
+**Definisi:**
+{title} adalah konsep fundamental yang penting untuk dipahami dalam konteks pembelajaran ini. Pemahaman yang baik tentang konsep ini akan membantu pembaca menguasai topik secara komprehensif.
+
+**Penjelasan Utama:**
+Konsep {title} terdiri dari beberapa elemen penting yang saling berkaitan. Dengan memahami setiap elemen, pembaca akan dapat mengaplikasikan pengetahuan ini dalam situasi praktis.
+
+**Prinsip Dasar:**
+1. Pahami fondasi teori
+2. Identifikasi aplikasi praktis
+3. Latihan dengan contoh nyata
+4. Evaluasi pemahaman secara berkala
+
+"""
+    
+    def generate_analogy_content(self, title: str) -> str:
+        """Menghasilkan konten [ANALOGI]."""
+        return f"""#### [ANALOGI]
+
+Untuk lebih mudah memahami **{title}**, bayangkan prosesnya seperti membangun sebuah rumah:
+
+**Fondasi** mewakili pemahaman dasar yang kuat. Tanpa fondasi yang baik, bangunan tidak akan kokoh.
+
+**Tiang dan Dinding** mewakili konsep-konsep penopang yang menghubungkan fondasi dengan bagian lainnya.
+
+**Atap** mewakili hasil akhir yang melindungi seluruh bangunan dan memberikan manfaat.
+
+Dengan memahami analogi ini, kita bisa melihat bagaimana {title} berfungsi secara keseluruhan dalam sebuah sistem yang terorganisir.
+
+"""
+    
+    def generate_rumus_content(self, title: str) -> str:
+        """Menghasilkan konten [RUMUS]."""
+        return f"""#### [RUMUS]
+
+**Prinsip Utama {title}:**
+
+Untuk mengaplikasikan {title} secara efektif, perhatikan langkah-langkah berikut:
+
+1. Identifikasi komponen utama
+2. Pahami hubungan antar komponen
+3. Terapkan dengan urutan yang benar
+4. Evaluasi hasil secara berkala
+
+**Catatan Penting:**
+Prinsip ini berlaku umum dan dapat diadaptasi sesuai kebutuhan spesifik. Selalu pertimbangkan konteks sebelum mengaplikasikan.
+
+```
+Format dokumentasi:
+- Komponen utama
+- Langkah-langkah aplikasi
+- Kriteria keberhasilan
+```
+
+"""
+    
+    def generate_contoh_content(self, title: str, chapter_num: int = 1) -> str:
+        """Menghasilkan konten [CONTOH]."""
+        return f"""#### [CONTOH]
+
+**Contoh Praktis Penerapan {title}:**
+
+Dalam proyek nyata, penerapan {title} dapat dilakukan dengan langkah-langkah berikut:
+
+**Langkah 1: Persiapan**
+- Identifikasi kebutuhan
+- Siapkan resources yang diperlukan
+- Tentukan timeline execution
+
+**Langkah 2: Implementasi**
+- Execute tahap pertama
+- Monitor progress
+- Adjust jika diperlukan
+
+**Langkah 3: Evaluasi**
+- Review hasil
+- Identifikasi improvement
+- Document learning
+
+**Contoh Implementasi:**
+```
+# Pseudo-code untuk {title}
+def implement_{title.replace(' ', '_').lower()}():
+    persiapkan()
+    eksekusi()
+    evaluasi()
+    return hasil
+```
+
+"""
+    
+    def generate_aplikasi_content(self, title: str) -> str:
+        """Menghasilkan konten [APLIKASI]."""
+        return f"""#### [APLIKASI]
+
+**Penerapan Nyata {title} dalam Kehidupan Sehari-hari:**
+
+{title} memiliki banyak aplikasi praktis yang dapat memberikan manfaat langsung:
+
+1. **Aplikasi dalam Pembelajaran**
+   - Mempermudah pemahaman konsep kompleks
+   - Memberikan kerangka berpikir sistematis
+
+2. **Aplikasi dalam Profesional**
+   - Meningkatkan efisiensi kerja
+   - Memperbaiki kualitas output
+
+3. **Aplikasi dalam Pengambilan Keputusan**
+   - Menyediakan kerangka analisis
+   - Membantu evaluasi alternatif
+
+**Best Practices:**
+- Selalu mulai dengan pemahaman dasar
+- Praktikkan secara konsisten
+- Evaluate dan improve secara berkala
+
+**Tips Penggunaan:**
+Manfaatkan {title} sebagai alat bantu untuk mencapai tujuan pembelajaran dan profesional Anda.
+
+"""
+    
+    def write_subsection_content(self, subsection: Dict[str, Any], chapter_num: int) -> str:
+        """Menulis konten lengkap untuk satu subsection."""
+        title = subsection.get("subtopic_title", "Subtopik")
         
         lines = []
+        lines.append(self.write_subsection_header(subsection))
+        lines.append(self.generate_concept_content(title))
+        lines.append(self.generate_analogy_content(title))
+        lines.append(self.generate_rumus_content(title))
+        lines.append(self.generate_contoh_content(title, chapter_num))
+        lines.append(self.generate_aplikasi_content(title))
+        lines.append("---\n")
         
-        # Subsection header
-        lines.append(f"## {subsection_num}. {title}\n")
-        
-        # [KONSEP] section
-        lines.append("### [KONSEP]\n")
-        concept_text = self._generate_concept(title, content_type, key_concepts)
-        lines.append(f"{concept_text}\n")
-        
-        # [ANALOGI] section
-        lines.append("### [ANALOGI]\n")
-        analogy_text = self._generate_analogy(title)
-        lines.append(f"{analogy_text}\n")
-        
-        # [RUMUS] section (if applicable)
-        if content_type in ["praktikal", "teknis"]:
-            lines.append("### [RUMUS]\n")
-            lines.append("```\n")
-            lines.append(f"Prinsip: {title}\n")
-            lines.append("```\n\n")
-        
-        # [CONTOH] section
-        lines.append("### [CONTOH]\n")
-        example_text = self._generate_example(title, chapter_num)
-        lines.append(f"{example_text}\n")
-        
-        # [APLIKASI] section
-        lines.append("### [APLIKASI]\n")
-        application_text = self._generate_application(title, key_concepts)
-        lines.append(f"{application_text}\n")
-        
-        lines.append("---\n\n")
-        
-        content = ''.join(lines)
+        content = '\n'.join(lines)
         self.words_written += len(content.split())
         
         return content
     
-    def _generate_concept(
-        self,
-        title: str,
-        content_type: str,
-        key_concepts: List[str]
-    ) -> str:
-        """
-        Generate [KONSEP] content.
-        
-        Args:
-            title: Subsection title.
-            content_type: Content type.
-            key_concepts: Key concepts to cover.
-        
-        Returns:
-            Generated concept text.
-        """
-        # Simple template-based generation for MVP
-        concept = f"""Dalam konteks **{title}**, kita perlu memahami beberapa hal fundamental:
-
-1. **Definisi**: {title} merujuk pada konsep yang penting dalam pemahaman topik ini.
-2. **Prinsip Dasar**: Konsep ini建立在 beberapa prinsip utama yang saling terkait.
-3. **Konteks Penggunaan**: {title} применяется dalam berbagai scenario praktis.
-
-Konsep-konsep kunci yang perlu dipahami:
-"""
-        
-        for concept in key_concepts[:5]:
-            concept += f"\n- {concept.capitalize()}"
-        
-        return concept
-    
-    def _generate_analogy(self, title: str) -> str:
-        """
-        Generate [ANALOGI] content.
-        
-        Args:
-            title: Subsection title.
-        
-        Returns:
-            Generated analogy text.
-        """
-        return f"""Bayangkan {title} seperti membangun rumah:
-
-- **Fondasi** = Pemahaman dasar yang kuat
-- **Tiang** = Konsep-konsep penopang utama
-- **Atap** = Hasil akhir yang melindungi
-
-Dengan memahami analogi ini, kita bisa melihat bagaimana {title} berfungsi secara keseluruhan. seperti bagian-bagian rumah yang bekerja sama untuk menciptakan struktur yang kokoh."""
-    
-    def _generate_example(self, title: str, chapter_num: int) -> str:
-        """
-        Generate [CONTOH] content.
-        
-        Args:
-            title: Subsection title.
-            chapter_num: Chapter number.
-        
-        Returns:
-            Generated example text.
-        """
-        return f"""**Contoh Praktis {title}:**
-
-Misalnya, dalam proyek pengembangan ebook ini, kita bisa melihat implementasi dari {title}:
-
-```
-Langkah 1: Identifikasi kebutuhan
-Langkah 2: Susun struktur
-Langkah 3: Implementasi bertahap
-Langkah 4: Review dan evaluasi
-```
-
-Contoh ini menunjukkan bagaimana {title} diterapkan dalam workflow nyata untuk menghasilkan hasil yang optimal."""
-    
-    def _generate_application(
-        self,
-        title: str,
-        key_concepts: List[str]
-    ) -> str:
-        """
-        Generate [APLIKASI] content.
-        
-        Args:
-            title: Subsection title.
-            key_concepts: Key concepts.
-        
-        Returns:
-            Generated application text.
-        """
-        applications = []
-        
-        for concept in key_concepts[:3]:
-            applications.append(f"- **{concept.capitalize()}**: Digunakan dalam scenario nyata untuk peningkatan pemahaman")
-        
-        return f"""**Penerapan dalam Kehidupan Nyata:**
-
-{chr(10).join(applications)}
-
-Dengan memahami aplikasi praktis dari {title}, kita dapat mengaplikasikan pengetahuan ini dalam berbagai konteks dan situasi."""
-    
-    def write_chapter(self, chapter: Dict[str, Any], mode: str = "test") -> str:
-        """
-        Write complete chapter content.
-        
-        Args:
-            chapter: Chapter configuration.
-            mode: Execution mode.
-        
-        Returns:
-            Chapter markdown content.
-        """
+    def write_chapter(self, chapter: Dict[str, Any]) -> str:
+        """Menulis konten lengkap satu bab."""
         lines = []
+        lines.append(self.write_chapter_header(chapter))
         
-        # Chapter header
-        chapter_num = chapter.get("number", 1)
-        chapter_title = chapter.get("title", f"Chapter {chapter_num}")
-        description = chapter.get("description", "")
-        
-        lines.append(f"# Chapter {chapter_num}: {chapter_title}\n\n")
-        
-        if description:
-            lines.append(f"> *{description}*\n\n")
-        
-        # Sections
         sections = chapter.get("sections", [])
-        total_subsections = 0
         
-        for section_idx, section in enumerate(sections, 1):
-            section_title = section.get("title", f"Section {section_idx}")
-            
-            lines.append(f"## {section_idx}. {section_title}\n\n")
-            
-            if "description" in section:
-                lines.append(f"_{section.get('description')}_\n\n")
-            
-            # Subsections
+        for section in sections:
             subsections = section.get("subsections", [])
             
-            for subsection_idx, subsection in enumerate(subsections, 1):
-                global_idx = total_subsections + subsection_idx
-                content = self.write_subsection_content(
-                    subsection,
-                    chapter_num,
-                    section_idx,
-                    global_idx
-                )
+            for subsection in subsections:
+                chapter_num = chapter.get("chapter_number", 1)
+                content = self.write_subsection_content(subsection, chapter_num)
                 lines.append(content)
-            
-            total_subsections += len(subsections)
         
         return ''.join(lines)
     
+    def write_closing(self) -> str:
+        """Menulis penutup ebook."""
+        return """
+---
+
+# Ringkasan
+
+Dalam ebook ini, kita telah membahas konsep-konsep penting yang diperlukan untuk memahami topik secara komprehensif. Dengan memahami setiap bab dan subbab, pembaca diharapkan dapat:
+
+1. Memahami fondasi teori secara mendalam
+2. Menerapkan pengetahuan dalam praktik
+3. Mengembangkan kemampuan analitis
+4. Mengaplikasikan dalam konteks nyata
+
+---
+
+**Catatan:**
+Ebook ini disusun untuk tujuan pembelajaran. Untuk informasi lebih lanjut, silakan konsultasikan dengan ahli di bidang terkait.
+
+---
+
+*Akhir dari dokumen*
+"""
+    
     def write_ebook(self, run_context: RunContext) -> str:
-        """
-        Write complete ebook content.
-        
-        Args:
-            run_context: Current run context.
-        
-        Returns:
-            Complete ebook markdown content.
-        """
+        """Menulis konten ebook lengkap."""
         chapters = self.outline.get("chapters", [])
-        mode = run_context.mode
+        
+        self.setup_ai_client()
         
         lines = []
         
-        # Title page
-        lines.append(f"# {self.outline.get('ebook_title', 'Untitled Ebook')}\n\n")
-        lines.append(f"**Target Audience:** {run_context.target_audience}\n\n")
-        lines.append(f"**Reading Level:** {run_context.reading_level}\n\n")
-        lines.append(f"**Generated:** {run_context.timestamp_start}\n\n")
-        lines.append("---\n\n")
+        lines.append(self.write_header(
+            self.outline.get("ebook_title", "Untitled Ebook"),
+            run_context.target_audience or "General Audience",
+            run_context.reading_level or "intermediate",
+            run_context.timestamp_start
+        ))
         
-        # Table of contents (simple)
-        lines.append("# Table of Contents\n\n")
-        for i, chapter in enumerate(chapters, 1):
-            lines.append(f"{i}. [{chapter.get('title', f'Chapter {i}')}](#chapter-{i})\n")
-        lines.append("\n---\n\n")
+        lines.append(self.write_toc(chapters))
         
-        # Chapters
         for chapter in chapters:
-            chapter_content = self.write_chapter(chapter, mode)
+            chapter_content = self.write_chapter(chapter)
             lines.append(chapter_content)
         
-        # Summary/Conclusion
-        lines.append("# Ringkasan\n\n")
-        lines.append("Dalam ebook ini, kita telah membahas konsep-konsep penting ")
-        lines.append("yang diperlukan untuk memahami topik secara komprehensif.\n\n")
+        lines.append(self.write_closing())
         
         return ''.join(lines)
     
-    def save_ebook(self, output_file: str = "output/ebook.md") -> None:
-        """
-        Save ebook content to markdown file.
+    def validate_content(self, content: str) -> tuple[bool, List[str]]:
+        """Memvalidasi konten yang dihasilkan."""
+        errors = []
         
-        Args:
-            output_file: Output file path.
-        """
+        foreign_patterns = [
+            r'[\u4e00-\u9fff]',
+            r'[\u0400-\u04ff]',
+            r'[\u0600-\u06ff]',
+            r'[\u3040-\u309f\u30a0-\u30ff]'
+        ]
+        
+        for pattern in foreign_patterns:
+            if re.search(pattern, content):
+                errors.append(f"Teks asing terdeteksi")
+                self.foreign_text_detected = True
+        
+        placeholder_patterns = [r'lorem ipsum', r'placeholder', r'todo', r'fixme']
+        for pattern in placeholder_patterns:
+            if re.search(pattern, content, re.IGNORECASE):
+                errors.append(f"Placeholder mentah terdeteksi: {pattern}")
+        
+        required_layers = ["[KONSEP]", "[ANALOGI]", "[RUMUS]", "[CONTOH]", "[APLIKASI]"]
+        for layer in required_layers:
+            if layer not in content:
+                errors.append(f"Lapisan hilang: {layer}")
+        
+        return len(errors) == 0, errors
+    
+    def save_ebook(self, output_file: str = "output/ebook.md") -> None:
+        """Menyimpan konten ebook ke file markdown."""
         if not self.content:
-            logger.warning("No content to save - run write_ebook first")
+            logger.warning("Tidak ada konten untuk disimpan")
             return
         
         output_path = Path(output_file)
@@ -362,48 +391,33 @@ Dengan memahami aplikasi praktis dari {title}, kita dapat mengaplikasikan penget
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(content_str)
         
-        logger.info(f"Ebook saved to {output_path} ({self.words_written} words)")
+        logger.info(f"Ebook disimpan ke {output_path} ({self.words_written} kata)")
     
     def execute(self, run_context: RunContext) -> str:
-        """
-        Execute writer agent.
-        
-        Args:
-            run_context: Current run context.
-        
-        Returns:
-            Ebook content string.
-        """
+        """Menjalankan writer agent."""
         logger.info("WriterAgent executing...")
         
-        # Load outline
         outline = self.load_outline()
         
         if not outline:
-            logger.error("No outline available - cannot write ebook")
+            logger.error("Tidak ada outline tersedia")
             return ""
         
-        # Write ebook
         content = self.write_ebook(run_context)
         self.content = content
         
-        # Save
+        is_valid, errors = self.validate_content(content)
+        if not is_valid:
+            logger.warning(f"Content validation errors: {errors}")
+        
         self.save_ebook()
         
-        logger.info(f"WriterAgent completed - wrote {self.words_written} words")
+        logger.info(f"WriterAgent completed - ditulis {self.words_written} kata")
         
         return content
 
 
 def run_writer_agent(run_context: RunContext) -> str:
-    """
-    Convenience function to run WriterAgent.
-    
-    Args:
-        run_context: Current run context.
-    
-    Returns:
-        Ebook content string.
-    """
+    """Fungsi convenience untuk menjalankan WriterAgent."""
     agent = WriterAgent()
     return agent.execute(run_context)
