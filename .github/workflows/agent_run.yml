@@ -148,7 +148,7 @@ jobs:
         run: |
           echo "=== Generated Output Files ==="
           if [ -d output ]; then
-            find output -type f -name "*.md" -o -name "*.json" -o -name "*.txt" 2>/dev/null | head -20
+            find output -type f \( -name "*.md" -o -name "*.json" -o -name "*.txt" \) 2>/dev/null | head -20
           else
             echo "No output directory found"
           fi
@@ -164,51 +164,90 @@ jobs:
       - name: Create GitHub Issue Comment
         if: github.event_name == 'issues'
         run: |
-          echo "=== Creating Issue Comment ==="
+          python3 << 'PYTHON_SCRIPT'
+          import json
+          import os
+          import urllib.request
+          import urllib.parse
           
-          # Check if run_report.json exists
-          if [ -f output/run_report.json ]; then
-            STATUS=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('status', 'UNKNOWN'))")
-            MODE=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('mode', 'UNKNOWN'))")
-            AGENTS=$(python3 -c "import json; r=json.load(open('output/run_report.json')); print(len(r.get('execution', {}).get('agents_executed', [])))")
-            FAILED=$(python3 -c "import json; r=json.load(open('output/run_report.json')); print(len(r.get('execution', {}).get('agents_failed', [])))")
-            COST=$(python3 -c "import json; print(json.load(open('output/run_report.json')).get('summary', {}).get('total_cost_usd', 0))")
-            
-            # Check fallback info
-            FALLBACK_USED="false"
-            FALLBACK_REASON=""
-            if [ -f output/fallback_info.json ]; then
-              FALLBACK_USED=$(python3 -c "import json; print(json.load(open('output/fallback_info.json')).get('fallback_used', 'false'))")
-              FALLBACK_REASON=$(python3 -c "import json; print(json.load(open('output/fallback_info.json')).get('fallback_reason', ''))")
-            fi
-            
-            COMMENT="Ebook generation completed.
-
-Status: ${STATUS}
-Mode: ${MODE}
-Agents executed: ${AGENTS}
-Agents failed: ${FAILED}
-Total cost: $${COST}"
-
-if [ "${FALLBACK_USED}" = "True" ]; then
-  COMMENT="${COMMENT}
-
-Fallback used: Yes
-Reason: ${FALLBACK_REASON}"
-fi
-
-COMMENT="${COMMENT}
-
-Artifacts available in Actions run."
-          else
-            COMMENT="Ebook generation failed or no output produced. Check Actions logs for details."
-          fi
+          # Read run_report.json if exists
+          report_data = {}
+          try:
+              with open('output/run_report.json', 'r') as f:
+                  report_data = json.load(f)
+          except:
+              pass
           
-          echo "${COMMENT}" > comment.txt
+          # Build comment
+          status = report_data.get('status', 'UNKNOWN')
+          mode = report_data.get('mode', 'UNKNOWN')
           
-          curl -s -X POST \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments \
-            -d "{\"body\": \"$(cat comment.txt)\"}"
-        shell: bash
+          # Agents info
+          execution = report_data.get('execution', {})
+          agents_executed = execution.get('agents_executed', [])
+          agents_failed = execution.get('agents_failed', [])
+          
+          # Summary
+          summary = report_data.get('summary', {})
+          total_tokens = summary.get('total_tokens_used', 0)
+          total_cost = summary.get('total_cost_usd', 0)
+          
+          # Fallback info
+          fallback_info = report_data.get('fallback_info', {})
+          fallback_used = fallback_info.get('fallback_used', False)
+          fallback_reason = fallback_info.get('fallback_reason', '')
+          provider_used = fallback_info.get('provider_used', 'unknown')
+          
+          # Build comment text
+          lines = [
+              "Ebook generation completed.",
+              "",
+              f"Status: {status}",
+              f"Mode: {mode}",
+              f"Agents executed: {len(agents_executed)}",
+              f"Agents failed: {len(agents_failed)}",
+              f"Total cost: ${total_cost:.4f}",
+          ]
+          
+          if fallback_used:
+              lines.append(f"Fallback used: Yes")
+              if fallback_reason:
+                  lines.append(f"Fallback reason: {fallback_reason[:100]}")
+          
+          if provider_used and provider_used != 'unknown':
+              lines.append(f"Provider used: {provider_used}")
+          
+          lines.append("")
+          lines.append("Artifacts available in Actions run.")
+          
+          comment_body = "\n".join(lines)
+          
+          # Create comment via GitHub API
+          issue_number = os.environ.get('GITHUB_ISSUE_NUMBER', '')
+          if not issue_number:
+              print("No issue number, skipping comment")
+              exit(0)
+          
+          api_url = f"https://api.github.com/repos/{os.environ.get('GITHUB_REPOSITORY')}/issues/{issue_number}/comments"
+          
+          payload = json.dumps({"body": comment_body}).encode('utf-8')
+          
+          req = urllib.request.Request(
+              api_url,
+              data=payload,
+              headers={
+                  'Content-Type': 'application/json',
+                  'Authorization': f"Bearer {os.environ.get('GITHUB_TOKEN')}",
+                  'Accept': 'application/vnd.github.v3+json'
+              },
+              method='POST'
+          )
+          
+          try:
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  print(f"Comment created successfully")
+          except Exception as e:
+              print(f"Failed to create comment: {e}")
+          
+          PYTHON_SCRIPT
+        shell: python3

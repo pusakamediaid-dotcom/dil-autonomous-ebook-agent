@@ -3,15 +3,59 @@ DIL Autonomous Ebook Agent - API Client Module
 
 Jembatan tunggal untuk memanggil berbagai provider AI API.
 Mendukung OpenAI, Gemini, dan OpenRouter (OpenAI-compatible).
+Error logging disensor untuk tidak membocorkan secrets.
 """
 
 import json
-import time
-from typing import Dict, Any, Optional, List
+import re
+from typing import Dict, Any, Optional
 
 from .logger import get_logger
 
 logger = get_logger(__name__)
+
+
+# Patterns untuk sensor secrets
+SECRET_PATTERNS = [
+    r'sk-[a-zA-Z0-9]{20,}',
+    r'ghp_[a-zA-Z0-9]{36,}',
+    r'ghs_[a-zA-Z0-9]{36,}',
+    r'ghu_[a-zA-Z0-9]{36,}',
+    r'gho_[a-zA-Z0-9]{36,}',
+    r'AIza[a-zA-Z0-9_-]{35,}',
+    r'Bearer\s+[a-zA-Z0-9_-]{20,}',
+    r'authorization["\']?\s*:\s*["\']?[a-zA-Z0-9_-]{20,}',
+    r'api_key["\']?\s*:\s*["\']?[a-zA-Z0-9_-]{20,}',
+    r'password["\']?\s*:\s*["\']?[^"\']{8,}',
+    r'private[_-]?key["\']?\s*:\s*["\']?[a-zA-Z0-9_-]{40,}',
+]
+
+
+def sanitize_error_message(error_text: str) -> str:
+    """
+    Sensor secrets dari error message.
+    
+    Args:
+        error_text: Error message mentah.
+    
+    Returns:
+        Error message yang sudah disensor.
+    """
+    if not error_text:
+        return "Unknown error"
+    
+    sanitized = error_text
+    
+    for pattern in SECRET_PATTERNS:
+        sanitized = re.sub(pattern, '[REDACTED]', sanitized, flags=re.IGNORECASE)
+    
+    # Hapus long alphanumeric strings (potential keys)
+    sanitized = re.sub(r'[a-zA-Z0-9_-]{50,}', '[REDACTED]', sanitized)
+    
+    # Hapus base64-like strings
+    sanitized = re.sub(r'[A-Za-z0-9+/]{40,}={0,2}', '[REDACTED]', sanitized)
+    
+    return sanitized
 
 
 class AIClient:
@@ -63,18 +107,7 @@ class AIClient:
         api_key: str,
         model_type: str
     ) -> Dict[str, Any]:
-        """
-        Memanggil OpenAI API.
-        
-        Args:
-            prompt: Prompt teks.
-            provider_config: Konfigurasi provider.
-            api_key: API key OpenAI.
-            model_type: "fast" atau "strong".
-        
-        Returns:
-            Response dictionary.
-        """
+        """Memanggil OpenAI API."""
         try:
             import urllib.request
             import urllib.error
@@ -115,12 +148,18 @@ class AIClient:
             return self._extract_text_response(result, "openai")
             
         except urllib.error.HTTPError as e:
-            error_body = e.read().decode('utf-8') if e.fp else ""
-            logger.error(f"OpenAI HTTP Error: {e.code} - {error_body[:200]}")
-            return self._safe_error(f"OpenAI HTTP Error: {e.code}")
+            # Jangan log error body mentah
+            safe_message = f"OpenAI HTTP Error: {e.code}"
+            logger.error(safe_message)
+            return self._safe_error(safe_message)
+        except urllib.error.URLError as e:
+            safe_message = f"OpenAI Connection Error: {e.reason}"
+            logger.error(safe_message)
+            return self._safe_error(safe_message)
         except Exception as e:
-            logger.error(f"OpenAI API Error: {e}")
-            return self._safe_error(f"OpenAI Error: {str(e)}")
+            safe_message = sanitize_error_message(str(e))
+            logger.error(f"OpenAI API Error: {safe_message}")
+            return self._safe_error(f"OpenAI Error: {safe_message}")
     
     def _call_gemini(
         self,
@@ -129,18 +168,7 @@ class AIClient:
         api_key: str,
         model_type: str
     ) -> Dict[str, Any]:
-        """
-        Memanggil Google Gemini API.
-        
-        Args:
-            prompt: Prompt teks.
-            provider_config: Konfigurasi provider.
-            api_key: API key Gemini.
-            model_type: "fast" atau "strong".
-        
-        Returns:
-            Response dictionary.
-        """
+        """Memanggil Google Gemini API."""
         try:
             import urllib.request
             import urllib.error
@@ -177,12 +205,17 @@ class AIClient:
             return self._extract_gemini_response(result)
             
         except urllib.error.HTTPError as e:
-            error_body = e.read().decode('utf-8') if e.fp else ""
-            logger.error(f"Gemini HTTP Error: {e.code} - {error_body[:200]}")
-            return self._safe_error(f"Gemini HTTP Error: {e.code}")
+            safe_message = f"Gemini HTTP Error: {e.code}"
+            logger.error(safe_message)
+            return self._safe_error(safe_message)
+        except urllib.error.URLError as e:
+            safe_message = f"Gemini Connection Error: {e.reason}"
+            logger.error(safe_message)
+            return self._safe_error(safe_message)
         except Exception as e:
-            logger.error(f"Gemini API Error: {e}")
-            return self._safe_error(f"Gemini Error: {str(e)}")
+            safe_message = sanitize_error_message(str(e))
+            logger.error(f"Gemini API Error: {safe_message}")
+            return self._safe_error(f"Gemini Error: {safe_message}")
     
     def _call_openai_compatible(
         self,
@@ -191,18 +224,7 @@ class AIClient:
         api_key: str,
         model_type: str
     ) -> Dict[str, Any]:
-        """
-        Memanggil OpenAI-compatible API (misalnya OpenRouter).
-        
-        Args:
-            prompt: Prompt teks.
-            provider_config: Konfigurasi provider.
-            api_key: API key.
-            model_type: "fast" atau "strong".
-        
-        Returns:
-            Response dictionary.
-        """
+        """Memanggil OpenAI-compatible API (misalnya OpenRouter)."""
         try:
             import urllib.request
             import urllib.error
@@ -242,27 +264,23 @@ class AIClient:
             with urllib.request.urlopen(req, timeout=60) as response:
                 result = json.loads(response.read().decode('utf-8'))
                 
-            return self._extract_text_response(result, "openai-compatible")
+            return self._extract_text_response(result, "openrouter")
             
         except urllib.error.HTTPError as e:
-            error_body = e.read().decode('utf-8') if e.fp else ""
-            logger.error(f"OpenRouter HTTP Error: {e.code} - {error_body[:200]}")
-            return self._safe_error(f"OpenRouter HTTP Error: {e.code}")
+            safe_message = f"OpenRouter HTTP Error: {e.code}"
+            logger.error(safe_message)
+            return self._safe_error(safe_message)
+        except urllib.error.URLError as e:
+            safe_message = f"OpenRouter Connection Error: {e.reason}"
+            logger.error(safe_message)
+            return self._safe_error(safe_message)
         except Exception as e:
-            logger.error(f"OpenRouter API Error: {e}")
-            return self._safe_error(f"OpenRouter Error: {str(e)}")
+            safe_message = sanitize_error_message(str(e))
+            logger.error(f"OpenRouter API Error: {safe_message}")
+            return self._safe_error(f"OpenRouter Error: {safe_message}")
     
     def _extract_text_response(self, result: Dict[str, Any], source: str) -> Dict[str, Any]:
-        """
-        Mengekstrak teks dari response OpenAI-style.
-        
-        Args:
-            result: Response dictionary.
-            source: Sumber provider.
-        
-        Returns:
-            Dictionary dengan text atau error.
-        """
+        """Mengekstrak teks dari response OpenAI-style."""
         try:
             choices = result.get("choices", [])
             if choices and len(choices) > 0:
@@ -284,18 +302,11 @@ class AIClient:
             else:
                 return self._safe_error(f"Response tidak memiliki choices: {source}")
         except Exception as e:
-            return self._safe_error(f"Error extracting response: {str(e)}")
+            safe_message = sanitize_error_message(str(e))
+            return self._safe_error(f"Error extracting response: {safe_message}")
     
     def _extract_gemini_response(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mengekstrak teks dari response Gemini.
-        
-        Args:
-            result: Response dictionary.
-        
-        Returns:
-            Dictionary dengan text atau error.
-        """
+        """Mengekstrak teks dari response Gemini."""
         try:
             candidates = result.get("candidates", [])
             if candidates and len(candidates) > 0:
@@ -320,18 +331,11 @@ class AIClient:
             
             return self._safe_error("Response tidak memiliki candidates")
         except Exception as e:
-            return self._safe_error(f"Error extracting Gemini response: {str(e)}")
+            safe_message = sanitize_error_message(str(e))
+            return self._safe_error(f"Error extracting Gemini response: {safe_message}")
     
     def _safe_error(self, error_message: str) -> Dict[str, Any]:
-        """
-        Membuat response error yang aman (tidak mengandung data sensitif).
-        
-        Args:
-            error_message: Pesan error.
-        
-        Returns:
-            Dictionary error.
-        """
+        """Membuat response error yang aman."""
         self.last_error = error_message
         logger.error(f"API Error: {error_message}")
         
@@ -341,18 +345,6 @@ class AIClient:
             "error": error_message,
             "source": "unknown"
         }
-    
-    def safe_error_response(self, context: str) -> str:
-        """
-        Membuat pesan error yang aman untuk digunakan dalam ebook.
-        
-        Args:
-            context: Konteks operasi yang gagal.
-        
-        Returns:
-            Pesan error yang aman untuk ditampilkan.
-        """
-        return f"Konten untuk bagian ini sedang dalam pemrosesan. Silakan refresh nanti atau hubungi administrator jika masalah berlanjut."
     
     def get_stats(self) -> Dict[str, Any]:
         """Mendapatkan statistik request."""

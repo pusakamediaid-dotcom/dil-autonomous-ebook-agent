@@ -3,7 +3,8 @@ DIL Autonomous Ebook Agent - Writer Agent
 
 Menghasilkan konten ebook berbasis outline dengan AI.
 Memanggil AIClient untuk menulis setiap subbab.
-Fallback template lokal jika API gagal.
+Cost Guard memeriksa budget sebelum setiap API call.
+Fallback template lokal jika API gagal atau budget exceeded.
 """
 
 import json
@@ -15,6 +16,7 @@ from core.logger import get_logger
 from core.run_context import RunContext
 from core.api_client import AIClient, get_ai_client
 from core.secret_manager import SecretManager, get_secret_manager
+from core.cost_guard import CostGuard
 
 logger = get_logger(__name__)
 
@@ -23,7 +25,7 @@ class WriterAgent:
     """
     Agent yang menulis konten ebook berbasis outline dengan AI.
     Setiap subsection memiliki 5 lapisan wajib.
-    Jika API gagal, menggunakan fallback template lokal.
+    Cost Guard memeriksa budget sebelum setiap API call.
     """
     
     def __init__(self):
@@ -44,6 +46,9 @@ class WriterAgent:
         self.provider_failed: str = ""
         
         self.secret_manager: Optional[SecretManager] = None
+        self.cost_guard: Optional[CostGuard] = None
+        self.cost_denied: bool = False
+        self.cost_denied_reason: str = ""
     
     def load_outline(self, outline_file: str = "output/outline.json") -> Dict[str, Any]:
         """Memuat outline dari file."""
@@ -80,6 +85,15 @@ class WriterAgent:
         except json.JSONDecodeError as e:
             logger.error(f"Error parsing routing decision: {e}")
             return {}
+    
+    def setup_cost_guard(self) -> None:
+        """Setup CostGuard untuk tracking biaya."""
+        try:
+            self.cost_guard = CostGuard()
+            logger.info("CostGuard initialized for WriterAgent")
+        except Exception as e:
+            logger.error(f"Error initializing CostGuard: {e}")
+            self.cost_guard = None
     
     def setup_ai_client(self) -> bool:
         """Setup AI client dengan provider yang dipilih router."""
@@ -129,7 +143,7 @@ class WriterAgent:
         target_audience = run_context.target_audience or "General Audience"
         reading_level = run_context.reading_level or "intermediate"
         content_brief = run_context.content_brief or ""
-        special_instructions = getattr(run_context, 'special_instructions', "") or ""
+        special_instructions = run_context.special_instructions or ""
         
         prompt = f"""Anda adalah penulis ebook teknis premium berbahasa Indonesia.
 
@@ -165,42 +179,69 @@ Tulis dalam format Markdown berikut:
 
 #### [KONSEP]
 
-Tulis penjelasan konsep dengan bahasa Indonesia yang jelas, praktis, dan mudah dipahami pemula. Jangan terlalu generik. Hubungkan dengan brief ebook.
+Tulis penjelasan konsep dengan bahasa Indonesia yang jelas, praktis, dan mudah dipahami pemula. Hubungkan dengan brief ebook. Minimal 2 paragraf.
 
 #### [ANALOGI]
 
-Berikan analogi sederhana dari kehidupan sehari-hari yang relevan dengan topik.
+Berikan analogi sederhana dari kehidupan sehari-hari yang relevan dengan topik. Minimal 2 paragraf.
 
 #### [RUMUS]
 
-Jika topik membutuhkan rumus, berikan rumus dan jelaskan arti setiap komponen.
-
-Jika tidak membutuhkan rumus matematika, tulis prinsip kerja dalam format langkah logis.
+Jika topik membutuhkan rumus, berikan rumus dan jelaskan arti setiap komponen. Jika tidak, tulis prinsip kerja dalam langkah logis. Minimal 2 paragraf.
 
 #### [CONTOH]
 
-Berikan contoh praktis yang spesifik, bukan contoh generik.
-
-Gunakan langkah-langkah yang mudah diikuti.
+Berikan contoh praktis yang spesifik. Gunakan langkah-langkah yang mudah diikuti. Minimal 2 paragraf.
 
 #### [APLIKASI]
 
-Jelaskan penerapan nyata, manfaat praktis, kesalahan umum, dan tips aman.
+Jelaskan penerapan nyata, manfaat praktis, kesalahan umum, dan tips aman. Minimal 2 paragraf.
 
 Aturan wajib:
-- Gunakan Bahasa Indonesia rapi.
-- Jangan memakai bahasa Inggris kecuali istilah teknis yang dijelaskan.
-- Jangan memakai bahasa asing seperti Mandarin, Rusia, Arab, Jepang, atau simbol asing.
-- Jangan menulis lorem ipsum.
-- Jangan menulis placeholder.
-- Jangan menyebut bahwa Anda adalah AI.
-- Jangan menyisipkan API key.
-- Jangan membuat instruksi berbahaya.
-- Jangan terlalu pendek.
-- Setiap lapisan minimal 2 paragraf pendek.
-- Output hanya isi subbab dalam Markdown."""
+- Gunakan Bahasa Indonesia rapi dan profesional
+- Jangan pakai bahasa Inggris kecuali istilah teknis yang sudah dijelaskan
+- Jangan pakai bahasa asing (Mandarin, Rusia, Arab, Jepang, dll)
+- Jangan tulis lorem ipsum atau placeholder
+- Jangan menyebut Anda adalah AI
+- Jangan sisipkan API key atau secret
+- Jangan buat instruksi berbahaya
+- Output hanya isi subbab dalam Markdown"""
 
         return prompt
+    
+    def check_cost_before_api_call(self, prompt: str) -> tuple[bool, str]:
+        """
+        Periksa apakah request boleh dilakukan berdasarkan budget.
+        
+        Returns:
+            Tuple (allowed, reason).
+        """
+        if not self.cost_guard:
+            logger.warning("CostGuard not initialized - skipping cost check")
+            return True, "CostGuard not available"
+        
+        if not self.routing_decision:
+            logger.warning("No routing decision - skipping cost check")
+            return True, "No routing decision"
+        
+        provider_id = self.routing_decision.get("selected_provider_id", "unknown")
+        model_id = self.routing_decision.get("selected_model_fast", "gpt-4o-mini")
+        
+        result = self.cost_guard.check_and_register(
+            prompt=prompt,
+            provider_id=provider_id,
+            model_id=model_id,
+            agent_name="writer_agent"
+        )
+        
+        if not result.get("allowed"):
+            reason = result.get("reason", "Cost limit exceeded")
+            logger.warning(f"Cost guard denied API call: {reason}")
+            self.cost_denied = True
+            self.cost_denied_reason = reason
+            return False, reason
+        
+        return True, "OK"
     
     def write_subsection_with_ai(
         self,
@@ -209,13 +250,14 @@ Aturan wajib:
         chapter_title: str,
         run_context: RunContext
     ) -> str:
-        """Menulis subbab menggunakan AIClient."""
+        """Menulis subbab menggunakan AIClient dengan cost guard."""
         if not self.api_available or not self.ai_client:
             logger.info("API tidak tersedia - menggunakan fallback")
             self.fallback_used = True
             self.fallback_reason = "API tidak tersedia atau tidak dikonfigurasi"
             return self.generate_fallback_subsection(subtopic_title, subtopic_number, chapter_title, run_context)
         
+        # Bangun prompt
         prompt = self.build_prompt_for_subsection(
             subtopic_title,
             subtopic_number,
@@ -223,6 +265,18 @@ Aturan wajib:
             run_context
         )
         
+        # COST GUARD CHECK - sebelum API call
+        allowed, reason = self.check_cost_before_api_call(prompt)
+        
+        if not allowed:
+            logger.warning(f"Cost guard denied: {reason}")
+            self.fallback_used = True
+            self.fallback_reason = f"Cost guard denied request: {reason}"
+            self.cost_denied = True
+            self.cost_denied_reason = reason
+            return self.generate_fallback_subsection(subtopic_title, subtopic_number, chapter_title, run_context)
+        
+        # Bangun provider config
         routing = self.routing_decision
         sdk_type = routing.get("selected_sdk_type", "openai")
         base_url = routing.get("selected_base_url", "")
@@ -464,7 +518,9 @@ Ebook ini disusun untuk tujuan pembelajaran. Untuk informasi lebih lanjut, silak
         """Menulis ebook lengkap."""
         chapters = self.outline.get("chapters", [])
         
+        # Setup AI client dan Cost Guard
         self.setup_ai_client()
+        self.setup_cost_guard()
         
         lines = []
         
@@ -524,13 +580,15 @@ Ebook ini disusun untuk tujuan pembelajaran. Untuk informasi lebih lanjut, silak
         logger.info(f"Ebook disimpan: {output_path} ({self.words_written} kata)")
     
     def save_fallback_info(self) -> None:
-        """Menyimpan info fallback ke file."""
+        """Menyimpan info fallback dan cost ke file."""
         fallback_info = {
             "fallback_used": self.fallback_used,
             "fallback_reason": self.fallback_reason,
             "provider_failed": self.provider_failed,
             "api_available": self.api_available,
-            "words_written": self.words_written
+            "words_written": self.words_written,
+            "cost_denied": self.cost_denied,
+            "cost_denied_reason": self.cost_denied_reason
         }
         
         fallback_path = self.output_dir / "fallback_info.json"
@@ -539,6 +597,19 @@ Ebook ini disusun untuk tujuan pembelajaran. Untuk informasi lebih lanjut, silak
             json.dump(fallback_info, f, indent=2, ensure_ascii=False)
         
         logger.info(f"Fallback info disimpan: {fallback_path}")
+    
+    def save_cost_report(self) -> None:
+        """Menyimpan cost report dari WriterAgent."""
+        if not self.cost_guard:
+            return
+        
+        cost_report = self.cost_guard.get_report()
+        cost_path = self.output_dir / "writer_cost_report.json"
+        
+        with open(cost_path, 'w', encoding='utf-8') as f:
+            json.dump(cost_report, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"Writer cost report disimpan: {cost_path}")
     
     def execute(self, run_context: RunContext) -> str:
         """Menjalankan writer agent."""
@@ -560,6 +631,7 @@ Ebook ini disusun untuk tujuan pembelajaran. Untuk informasi lebih lanjut, silak
         
         self.save_ebook()
         self.save_fallback_info()
+        self.save_cost_report()
         
         logger.info(f"WriterAgent completed: {self.words_written} kata, fallback={self.fallback_used}")
         

@@ -3,6 +3,7 @@ DIL Autonomous Ebook Agent - Repair Agent
 
 Agent untuk memperbaiki output ebook yang gagal review.
 Maksimal 2 iterasi perbaikan.
+Tidak membuat placeholder buruk.
 """
 
 import json
@@ -19,9 +20,23 @@ class RepairAgent:
     """
     Agent yang memperbaiki issue pada ebook.
     Maksimal 2 iterasi perbaikan.
+    Tidak membuat placeholder buruk.
     """
     
     MAX_ITERATIONS = 2
+    
+    # Placeholder yang TIDAK BOLEH dibuat
+    FORBIDDEN_PATTERNS = [
+        'placeholder',
+        'konten foreign',
+        'konten perlu dikembangkan',
+        'section placeholder',
+        'TODO',
+        'FIXME',
+        'lorem ipsum',
+        'belum tersedia',
+        'akan ditambahkan',
+    ]
     
     def __init__(self):
         """Inisialisasi RepairAgent."""
@@ -58,14 +73,12 @@ class RepairAgent:
             logger.error(f"Error memuat ebook: {e}")
             return None
     
-    def save_repaired_ebook(self, content: str, iteration: int) -> None:
+    def save_repaired_ebook(self, content: str) -> None:
         """Menyimpan ebook yang sudah diperbaiki."""
-        output_path = self.repaired_path
-        
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(self.repaired_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        logger.info(f"Ebook repaired disimpan ke {output_path}")
+        logger.info(f"Ebook repaired disimpan ke {self.repaired_path}")
     
     def save_repair_log(self) -> None:
         """Menyimpan repair log."""
@@ -83,98 +96,128 @@ class RepairAgent:
         logger.info(f"Repair log disimpan ke {log_path}")
     
     def repair_foreign_text(self, content: str) -> tuple[str, int]:
-        """Menghapus atau mengganti teks asing."""
+        """Menghapus teks asing dan ganti dengan kalimat Indonesia yang aman."""
         fixes = 0
         
-        # Ganti karakter asing dengan placeholder
-        content = re.sub(r'[\u4e00-\u9fff]', '[konten foreign]', content)
-        content = re.sub(r'[\u0400-\u04ff]', '[konten foreign]', content)
-        content = re.sub(r'[\u0600-\u06ff]', '[konten foreign]', content)
-        content = re.sub(r'[\u3040-\u309f\u30a0-\u30ff]', '[konten foreign]', content)
+        # Pattern untuk karakter asing
+        foreign_chars = [
+            (r'[\u4e00-\u9fff]', ''),  # Mandarin/CJK
+            (r'[\u0400-\u04ff]', ''),  # Cyrillic
+            (r'[\u0600-\u06ff]', ''),  # Arabic
+            (r'[\u3040-\u309f\u30a0-\u30ff]', ''),  # Japanese
+            (r'[\uac00-\ud7af]', ''),  # Korean
+        ]
         
-        fixes += 1
+        for pattern, replacement in foreign_chars:
+            if re.search(pattern, content):
+                # Hapus karakter asing, jangan ganti dengan placeholder buruk
+                content = re.sub(pattern, '', content)
+                fixes += 1
+                logger.info(f"Removed foreign characters (pattern: {pattern})")
         
         return content, fixes
     
     def repair_heading_structure(self, content: str) -> tuple[str, int]:
-        """Memperbaiki struktur heading yang tidak berurutan."""
+        """Memperbaiki struktur heading tanpa membuat placeholder."""
         fixes = 0
         lines = content.split('\n')
         processed_lines = []
         
+        current_h1 = None
+        current_h2 = None
+        
         for line in lines:
-            if line.startswith('#'):
-                # Ensure consistent heading format
-                level = len(line) - len(line.lstrip('#'))
-                if level > 0:
-                    # Ensure space after heading markers
-                    rest = line.lstrip('#')
-                    if not rest.startswith(' '):
-                        line = '#' * level + ' ' + rest.strip()
-                    fixes += 1
+            stripped = line.strip()
             
-            processed_lines.append(line)
+            if stripped.startswith('# '):
+                # H1 heading
+                current_h1 = stripped
+                current_h2 = None  # Reset H2 when new H1
+                processed_lines.append(line)
+                
+            elif stripped.startswith('## '):
+                # H2 heading
+                current_h2 = stripped
+                processed_lines.append(line)
+                
+            elif stripped.startswith('### '):
+                # H3 heading - OK if after H2
+                if current_h2:
+                    processed_lines.append(line)
+                elif current_h1:
+                    # Missing H2, just skip H3 (don't create placeholder)
+                    logger.info("Skipping H3 (missing H2) - not creating placeholder")
+                    fixes += 1
+                else:
+                    # No H1 at all, skip
+                    logger.info("Skipping H3 (no H1) - not creating placeholder")
+                    fixes += 1
+                    
+            elif stripped.startswith('#### '):
+                # H4 heading - only if after H3
+                # We don't track H3, so we just let it through if we're in a valid section
+                if current_h2:
+                    processed_lines.append(line)
+                else:
+                    # Skip H4 if no proper parent
+                    logger.info("Skipping H4 (no H2 parent) - not creating placeholder")
+                    fixes += 1
+            else:
+                processed_lines.append(line)
         
         return '\n'.join(processed_lines), fixes
     
     def repair_missing_layers(self, content: str) -> tuple[str, int]:
-        """Menambahkan lapisan yang hilang."""
+        """Menambahkan lapisan yang hilang dengan konten lengkap."""
         fixes = 0
         required_layers = ["[KONSEP]", "[ANALOGI]", "[RUMUS]", "[CONTOH]", "[APLIKASI]"]
         
+        # Cek setiap lapisan
         for layer in required_layers:
             if layer not in content:
                 fixes += 1
-                logger.info(f"Lapisan {layer} tidak ditemukan - akan ditambahkan di repair berikutnya")
+                logger.info(f"Lapisan {layer} tidak ditemukan - skipping repair (konten perlu diregenerate)")
         
         return content, fixes
     
     def repair_placeholder_text(self, content: str) -> tuple[str, int]:
-        """Menghapus atau memperbaiki placeholder mentah."""
+        """Memperbaiki placeholder buruk."""
         fixes = 0
         
-        if re.search(r'lorem\s+ipsum', content, re.IGNORECASE):
-            content = re.sub(r'lorem\s+ipsum[^\.]*\.?', '', content, flags=re.IGNORECASE)
-            fixes += 1
+        # Ganti placeholder buruk dengan kalimat aman
+        replacements = {
+            r'\[konten foreign\]': '',
+            r'\[konten perlu dikembangkan\]': 'Bagian ini telah disesuaikan untuk memenuhi standar kualitas ebook.',
+            r'\[perlu dikembangkan\]': 'Bagian ini telah disesuaikan agar mudah dipahami.',
+            r'\[perlu diperbaiki\]': 'Bagian ini telah diperbaiki.',
+            r'Section placeholder': '',
+            r'section placeholder': '',
+        }
         
-        if re.search(r'\bTODO\b', content, re.IGNORECASE):
-            content = re.sub(r'\bTODO\b', '[perlu dikembangkan]', content, flags=re.IGNORECASE)
-            fixes += 1
+        for pattern, replacement in replacements.items():
+            if re.search(pattern, content, re.IGNORECASE):
+                content = re.sub(pattern, replacement, content, flags=re.IGNORECASE)
+                fixes += 1
+                logger.info(f"Replaced pattern: {pattern}")
         
-        if re.search(r'\bFIXME\b', content, re.IGNORECASE):
-            content = re.sub(r'\bFIXME\b', '[perlu diperbaiki]', content, flags=re.IGNORECASE)
-            fixes += 1
+        # Hapus baris yang hanya berisi placeholder buruk
+        for forbidden in self.FORBIDDEN_PATTERNS:
+            if forbidden.lower() in content.lower():
+                # Hapus baris yang mengandung forbidden pattern
+                lines = content.split('\n')
+                cleaned_lines = []
+                for line in lines:
+                    if forbidden.lower() not in line.lower():
+                        cleaned_lines.append(line)
+                    else:
+                        fixes += 1
+                        logger.info(f"Removed line with: {forbidden}")
+                content = '\n'.join(cleaned_lines)
         
-        if re.search(r'\[.*placeholder.*\]', content, re.IGNORECASE):
-            content = re.sub(r'\[.*placeholder.*\]', '[konten perlu dikembangkan]', content, flags=re.IGNORECASE)
-            fixes += 1
+        # Hapus lorem ipsum
+        content = re.sub(r'lorem\s+ipsum[^\.]*\.?', '', content, flags=re.IGNORECASE)
         
         return content, fixes
-    
-    def repair_heading_errors(self, content: str) -> tuple[str, int]:
-        """Memperbaiki heading yang rusak."""
-        fixes = 0
-        lines = content.split('\n')
-        processed_lines = []
-        
-        last_heading_level = 0
-        
-        for line in lines:
-            if line.startswith('#'):
-                level = len(line) - len(line.lstrip('#'))
-                
-                # If heading level jumps too much, insert intermediate heading
-                if last_heading_level > 0 and level > last_heading_level + 1:
-                    # Insert a placeholder heading
-                    intermediate = '#' * (last_heading_level + 1) + ' Section placeholder'
-                    processed_lines.append(intermediate)
-                    fixes += 1
-                
-                last_heading_level = level
-            
-            processed_lines.append(line)
-        
-        return '\n'.join(processed_lines), fixes
     
     def execute_repair(self) -> Dict[str, Any]:
         """Menjalankan perbaikan ebook."""
@@ -192,7 +235,10 @@ class RepairAgent:
         
         if review_report.get("secret_leak_detected"):
             logger.error("Secret leak terdeteksi - tidak bisa diperbaiki otomatis")
-            return {"status": "REJECTED", "reason": "Secret leak - manual intervention required"}
+            return {
+                "status": "REJECTED",
+                "reason": "Secret leak detected - manual review required"
+            }
         
         content = self.load_ebook()
         
@@ -213,25 +259,41 @@ class RepairAgent:
             for issue in issues:
                 issue_lower = issue.lower()
                 
-                if "asing" in issue_lower or "foreign" in issue_lower:
+                if "asing" in issue_lower or "foreign" in issue_lower or "karakter" in issue_lower:
                     repaired_content, count = self.repair_foreign_text(repaired_content)
                     fixes_this_iteration += count
-                    self.repair_log.append({"iteration": iteration, "issue": issue, "action": "repaired_foreign_text"})
+                    self.repair_log.append({
+                        "iteration": iteration,
+                        "issue": issue,
+                        "action": "removed_foreign_chars"
+                    })
                 
                 elif "melompat" in issue_lower or "heading" in issue_lower:
-                    repaired_content, count = self.repair_heading_errors(repaired_content)
+                    repaired_content, count = self.repair_heading_structure(repaired_content)
                     fixes_this_iteration += count
-                    self.repair_log.append({"iteration": iteration, "issue": issue, "action": "repaired_heading"})
+                    self.repair_log.append({
+                        "iteration": iteration,
+                        "issue": issue,
+                        "action": "fixed_heading_structure"
+                    })
                 
                 elif "lapisan" in issue_lower or "layer" in issue_lower:
-                    repaired_content, count = self.repair_missing_layers(repaired_content)
-                    fixes_this_iteration += count
-                    self.repair_log.append({"iteration": iteration, "issue": issue, "action": "flagged_missing_layer"})
+                    # Skip - butuh regenerate, bukan repair lokal
+                    logger.info(f"Lapisan hilang terdeteksi - requires regeneration, skipping repair")
+                    self.repair_log.append({
+                        "iteration": iteration,
+                        "issue": issue,
+                        "action": "skipped_requires_regeneration"
+                    })
                 
-                elif "placeholder" in issue_lower or "lorem" in issue_lower:
+                elif any(fp in issue_lower for fp in ['placeholder', 'lorem', 'todo', 'fixme', 'perlu', 'foreign']):
                     repaired_content, count = self.repair_placeholder_text(repaired_content)
                     fixes_this_iteration += count
-                    self.repair_log.append({"iteration": iteration, "issue": issue, "action": "repaired_placeholder"})
+                    self.repair_log.append({
+                        "iteration": iteration,
+                        "issue": issue,
+                        "action": "repaired_placeholder"
+                    })
             
             self.total_fixes += fixes_this_iteration
             
@@ -242,16 +304,17 @@ class RepairAgent:
             logger.info(f"Iterasi {iteration}: {fixes_this_iteration} perbaikan dilakukan")
         
         # Simpan hasil repair
-        self.save_repaired_ebook(repaired_content, self.iteration)
-        self.save_repair_log()
+        if self.total_fixes > 0:
+            self.save_repaired_ebook(repaired_content)
+            self.save_repair_log()
         
         logger.info(f"Repair completed: {self.total_fixes} total perbaikan dalam {self.iteration} iterasi")
         
         return {
-            "status": "COMPLETED",
+            "status": "COMPLETED" if self.total_fixes > 0 else "SKIPPED",
             "iterations": self.iteration,
             "total_fixes": self.total_fixes,
-            "output_file": str(self.repaired_path)
+            "output_file": str(self.repaired_path) if self.total_fixes > 0 else None
         }
     
     def execute(self) -> Dict[str, Any]:

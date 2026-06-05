@@ -75,7 +75,7 @@ class RunContext:
         # Check for workflow_dispatch inputs first
         self._parse_workflow_dispatch_inputs()
         
-        # Parse issue body if available
+        # Parse issue body if available and no inputs from dispatch
         if self.issue_body and not self.ebook_title:
             self._parse_issue_body()
         
@@ -83,7 +83,6 @@ class RunContext:
     
     def _parse_workflow_dispatch_inputs(self) -> None:
         """Parse workflow_dispatch inputs dari environment."""
-        # Check INPUT_MODE first (from workflow_dispatch)
         input_mode = os.environ.get("INPUT_MODE", "")
         if input_mode:
             self.mode = input_mode.lower()
@@ -118,7 +117,7 @@ class RunContext:
         
         input_approval = os.environ.get("INPUT_APPROVAL", "")
         if input_approval:
-            self.approval_given = input_approval.lower() in ["true", "1", "yes"]
+            self.approval_given = input_approval.lower() in ["true", "1", "yes", "checked"]
         
         input_special = os.environ.get("INPUT_SPECIAL_INSTRUCTIONS", "")
         if input_special:
@@ -138,6 +137,10 @@ class RunContext:
             except ValueError:
                 pass
         
+        input_pdf = os.environ.get("INPUT_PDF_REQUIRED", "")
+        if input_pdf:
+            self.pdf_required = input_pdf.lower() in ["true", "1", "yes", "checked"]
+        
         if input_mode or input_title:
             logger.info("Parsed workflow_dispatch inputs")
     
@@ -145,7 +148,7 @@ class RunContext:
         """
         Parse issue body dari 3 format:
         1. Key-value format: Judul Ebook: ...
-        2. GitHub Issue Form Markdown: ### Judul Ebook
+        2. GitHub Issue Form Markdown: ### Judul Ebook ...
         3. Mix format
         """
         if not self.issue_body:
@@ -156,31 +159,70 @@ class RunContext:
         
         i = 0
         current_key = ""
+        current_value_lines = []
         
         while i < len(lines):
             line = lines[i].strip()
             
-            # Format 2: GitHub Issue Form Markdown (### Judul Ebook)
-            if line.startswith('### '):
-                current_key = line[4:].strip().lower().replace(' ', '_')
-                # Move to next line to get the value
-                i += 1
-                if i < len(lines):
-                    value_line = lines[i].strip()
-                    # Skip checkbox and dropdown lines
-                    while i < len(lines) and (value_line.startswith('-') or value_line.startswith('[') or not value_line):
-                        i += 1
-                        if i < len(lines):
-                            value_line = lines[i].strip()
-                    
-                    if value_line and not value_line.startswith('#') and not value_line.startswith('---'):
-                        self._set_field(current_key, value_line)
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
                 i += 1
                 continue
             
-            # Format 1: Key-value format (Judul Ebook: value)
-            if ':' in line:
-                # Handle both : and ： (full-width colon)
+            # Format: GitHub Issue Form Markdown (### Judul Ebook)
+            if line.startswith('### '):
+                # Save previous field if exists
+                if current_key and current_value_lines:
+                    value = '\n'.join(current_value_lines).strip()
+                    self._set_field(current_key, value)
+                    current_value_lines = []
+                
+                # Extract key from "### Judul Ebook"
+                current_key = line[4:].strip().lower().replace(' ', '_')
+                i += 1
+                
+                # Collect value lines until next heading or separator
+                while i < len(lines):
+                    next_line = lines[i].strip()
+                    
+                    # Stop at next heading
+                    if next_line.startswith('### '):
+                        break
+                    
+                    # Stop at separator
+                    if next_line == '---' or next_line.startswith('---'):
+                        break
+                    
+                    # Skip checkbox, dropdown options, and empty markers
+                    if next_line.startswith('- [ ]') or next_line.startswith('- [x]'):
+                        i += 1
+                        continue
+                    
+                    if next_line.startswith('- '):
+                        # Check if it's a dropdown option (single line with dash)
+                        # These are just options, not the actual value
+                        if i + 1 < len(lines):
+                            next_next = lines[i + 1].strip() if i + 1 < len(lines) else ""
+                            # If next line is also a dropdown, skip these
+                            if next_next.startswith('- '):
+                                i += 1
+                                continue
+                        # If it's a list item that's not an option, add it
+                        if not (next_line.startswith('- [ ]') or next_line.startswith('- [x]')):
+                            current_value_lines.append(next_line)
+                        i += 1
+                        continue
+                    
+                    # Add non-empty lines
+                    if next_line:
+                        current_value_lines.append(next_line)
+                    
+                    i += 1
+                
+                continue
+            
+            # Format: Key-value (Judul Ebook: value)
+            if ':' in line and not line.startswith('['):
                 if '：' in line:
                     parts = line.split('：', 1)
                 else:
@@ -189,50 +231,144 @@ class RunContext:
                 key = parts[0].strip().lower().replace(' ', '_')
                 value = parts[1].strip() if len(parts) > 1 else ""
                 
+                # If value is empty and we have previous value lines, use them
+                if not value and current_value_lines:
+                    value = '\n'.join(current_value_lines).strip()
+                    current_value_lines = []
+                
                 self._set_field(key, value)
             
             i += 1
         
+        # Save last field
+        if current_key and current_value_lines:
+            value = '\n'.join(current_value_lines).strip()
+            self._set_field(current_key, value)
+        
         logger.debug(f"Parsed issue body: mode={self.mode}, title={self.ebook_title[:30] if self.ebook_title else 'untitled'}")
     
     def _set_field(self, key: str, value: str) -> None:
-        """Set field berdasarkan key name."""
+        """Set field berdasarkan key name dengan mapping lengkap."""
         key_lower = key.lower()
         
-        # Map key variations
-        if key_lower in ['ebook_title', 'title', 'judul', 'nama_ebook']:
-            self.ebook_title = value
-        elif key_lower in ['target_audience', 'target_pembaca', 'pembaca']:
-            self.target_audience = value
-        elif key_lower in ['reading_level', 'level', 'level_pembaca']:
-            self.reading_level = value.lower()
-        elif key_lower in ['mode', 'mode_produksi', 'production_mode']:
-            self.mode = value.lower()
-        elif key_lower in ['total_chapters', 'chapters', 'jumlah_bab', 'bab']:
+        # Mapping lengkap untuk semua variasi key
+        mapping = {
+            # Judul Ebook variations
+            'judul_ebook': 'ebook_title',
+            'ebook_title': 'ebook_title',
+            'title': 'ebook_title',
+            'judul': 'ebook_title',
+            'nama_ebook': 'ebook_title',
+            
+            # Target Pembaca variations
+            'target_pembaca': 'target_audience',
+            'target_audience': 'target_audience',
+            'pembaca': 'target_audience',
+            'target': 'target_audience',
+            'audience': 'target_audience',
+            
+            # Level Pembaca variations
+            'level_pembaca': 'reading_level',
+            'reading_level': 'reading_level',
+            'level': 'reading_level',
+            
+            # Mode variations
+            'mode_produksi': 'mode',
+            'mode': 'mode',
+            'production_mode': 'mode',
+            
+            # Jumlah Bab variations
+            'jumlah_bab': 'total_chapters',
+            'total_chapters': 'total_chapters',
+            'bab': 'total_chapters',
+            'chapters': 'total_chapters',
+            
+            # Target Halaman variations
+            'target_halaman': 'target_pages',
+            'target_pages': 'target_pages',
+            'halaman': 'target_pages',
+            'pages': 'target_pages',
+            
+            # Nomor Sesi variations
+            'nomor_sesi': 'session_number',
+            'session_number': 'session_number',
+            'session': 'session_number',
+            'sesi': 'session_number',
+            
+            # Brief Konten variations
+            'brief_konten': 'content_brief',
+            'content_brief': 'content_brief',
+            'brief': 'content_brief',
+            'deskripsi': 'content_brief',
+            
+            # Special Instructions variations
+            'aturan_khusus': 'special_instructions',
+            'special_instructions': 'special_instructions',
+            'instruksi': 'special_instructions',
+            'instructions': 'special_instructions',
+            
+            # API Preference variations
+            'preferensi_api_provider': 'api_preference',
+            'api_preference': 'api_preference',
+            'api_provider': 'api_preference',
+            'provider': 'api_preference',
+            
+            # PDF variations
+            'pdf_diperlukan': 'pdf_required',
+            'pdf_required': 'pdf_required',
+            'pdf': 'pdf_required',
+            
+            # Approval variations
+            'approval_untuk_eksekusi': 'approval_given',
+            'approval_given': 'approval_given',
+            'approval': 'approval_given',
+            'approved': 'approval_given',
+        }
+        
+        target_field = mapping.get(key_lower, key_lower)
+        
+        # Convert value if needed
+        value_clean = value.strip()
+        
+        # Handle boolean fields
+        if target_field in ['pdf_required', 'approval_given']:
+            value_clean = value_clean.lower()
+            bool_true = ['true', 'yes', 'ya', '1', 'checked', 'y', 't', 'on']
+            if target_field == 'pdf_required':
+                self.pdf_required = value_clean in bool_true
+            elif target_field == 'approval_given':
+                self.approval_given = value_clean in bool_true
+            return
+        
+        # Handle integer fields
+        if target_field in ['total_chapters', 'target_pages', 'session_number']:
             try:
-                self.total_chapters = int(value)
+                int_val = int(value_clean)
+                if target_field == 'total_chapters':
+                    self.total_chapters = int_val
+                elif target_field == 'target_pages':
+                    self.target_pages = int_val
+                elif target_field == 'session_number':
+                    self.session_number = int_val
             except ValueError:
                 pass
-        elif key_lower in ['content_brief', 'brief', 'deskripsi']:
-            self.content_brief = value
-        elif key_lower in ['api_preference', 'api_provider', 'provider']:
-            self.api_preference = value.lower()
-        elif key_lower in ['pdf_required', 'pdf']:
-            self.pdf_required = value.lower() in ['true', 'yes', '1', 'ya']
-        elif key_lower in ['approval', 'approved', 'approval_given']:
-            self.approval_given = value.lower() in ['true', 'yes', '1', 'ya']
-        elif key_lower in ['special_instructions', 'aturan_khusus', 'instruksi']:
-            self.special_instructions = value
-        elif key_lower in ['target_pages', 'halaman', 'pages']:
-            try:
-                self.target_pages = int(value)
-            except ValueError:
-                pass
-        elif key_lower in ['session_number', 'session', 'nomor_sesi']:
-            try:
-                self.session_number = int(value)
-            except ValueError:
-                pass
+            return
+        
+        # Handle string fields
+        if target_field == 'mode':
+            self.mode = value_clean.lower()
+        elif target_field == 'ebook_title':
+            self.ebook_title = value_clean
+        elif target_field == 'target_audience':
+            self.target_audience = value_clean
+        elif target_field == 'reading_level':
+            self.reading_level = value_clean.lower()
+        elif target_field == 'content_brief':
+            self.content_brief = value_clean
+        elif target_field == 'special_instructions':
+            self.special_instructions = value_clean
+        elif target_field == 'api_preference':
+            self.api_preference = value_clean.lower()
     
     def mark_agent_done(self, agent_name: str) -> None:
         """Mark agent sebagai successfully completed."""

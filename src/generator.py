@@ -45,15 +45,13 @@ class EbookGenerator:
     4. If mode planning -> selesai
     5. Cek approval gate
     6. Run RouterAgent
-    7. Run CostGuard
-    8. Run OutlineAgent
-    9. Validate outline.json
-    10. Run WriterAgent
-    11. Validate ebook.md
-    12. Run ReviewerAgent
-    13. If status REPAIR -> Run RepairAgent (max 2 iterasi)
-    14. Run OutputValidator
-    15. Create reports
+    7. Run OutlineAgent
+    8. Run WriterAgent (dengan Cost Guard)
+    9. Validate ebook.md
+    10. Run ReviewerAgent
+    11. If status REPAIR -> Run RepairAgent
+    12. Run OutputValidator
+    13. Create reports
     """
     
     def __init__(self):
@@ -67,6 +65,7 @@ class EbookGenerator:
         self.fallback_used: bool = False
         self.fallback_reason: str = ""
         self.provider_used: str = ""
+        self.warnings: List[str] = []
         
         self.output_dir = Path("output")
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -85,22 +84,16 @@ class EbookGenerator:
         logger.info("ReportBuilder initialized")
     
     def validate_approval_gate(self) -> bool:
-        """
-        Validasi approval untuk mode besar.
-        
-        Returns:
-            True jika approved atau mode kecil.
-        """
+        """Validasi approval untuk mode besar."""
         mode = self.run_context.mode
         
-        # Modes kecil tidak butuh approval
         if mode in ["planning", "test", "session", "review", "repair"]:
             return True
         
-        # Modes besar butuh approval
         if mode in ["full", "html", "pdf"]:
             if not self.run_context.approval_given:
                 logger.error(f"Mode {mode} memerlukan approval. Pipeline berhenti.")
+                self.warnings.append(f"Mode {mode} requires approval")
                 return False
             return True
         
@@ -149,8 +142,6 @@ class EbookGenerator:
                 logger.warning(f"Routing failed: {decision.get('reason')}")
                 self.agents_failed.append("router_agent")
                 self.run_context.mark_agent_failed("router_agent")
-                
-                # Set fallback info
                 self.fallback_used = True
                 self.fallback_reason = "No provider available"
                 self.run_context.set_fallback(self.fallback_reason)
@@ -242,13 +233,11 @@ class EbookGenerator:
             logger.error("ebook.md tidak ditemukan")
             return False
         
-        # Validasi format markdown
         result = validate_markdown_file(str(ebook_path))
         
         if not result.get("is_valid", False):
             logger.warning(f"Ebook validation issues: {result.get('errors', [])}")
         
-        # Cek safety
         safety_result = check_file_safety(str(ebook_path))
         
         if not safety_result.get("is_safe", True):
@@ -302,6 +291,25 @@ class EbookGenerator:
             self.run_context.mark_agent_failed("repair_agent")
             return {"status": "ERROR"}
     
+    def _aggregate_cost_reports(self) -> Dict[str, Any]:
+        """Agregasi cost reports dari Writer Agent."""
+        writer_cost_path = self.output_dir / "writer_cost_report.json"
+        
+        if writer_cost_path.exists():
+            try:
+                with open(writer_cost_path, 'r', encoding='utf-8') as f:
+                    writer_cost = json.load(f)
+                    
+                # Merge dengan cost guard report
+                cost_report = self.cost_guard.get_report()
+                cost_report["writer_cost_report"] = writer_cost
+                
+                return cost_report
+            except Exception as e:
+                logger.warning(f"Error reading writer cost report: {e}")
+        
+        return self.cost_guard.get_report()
+    
     def finalize(self) -> None:
         """Finalisasi run - buat reports dan artifacts."""
         logger.info("=== FINALIZATION PHASE ===")
@@ -310,7 +318,7 @@ class EbookGenerator:
         
         output_files = self._get_output_files()
         
-        # Build run report dengan fallback info
+        # Build run report
         run_report = self.report_builder.build_run_report(
             self.run_context,
             self.agents_executed,
@@ -318,20 +326,35 @@ class EbookGenerator:
             output_files
         )
         
-        # Tambahkan fallback info ke run report
-        run_report["fallback_info"] = {
-            "fallback_used": self.fallback_used,
-            "fallback_reason": self.fallback_reason,
-            "provider_used": self.provider_used
-        }
+        # Add additional info
+        run_report["provider_used"] = self.provider_used
+        run_report["fallback_used"] = self.fallback_used
+        run_report["fallback_reason"] = self.fallback_reason
+        run_report["warnings"] = self.warnings
+        run_report["ebook_title"] = self.run_context.ebook_title
+        run_report["target_audience"] = self.run_context.target_audience
+        run_report["total_chapters"] = self.run_context.total_chapters
+        run_report["target_pages"] = self.run_context.target_pages
+        run_report["session_number"] = self.run_context.session_number
+        run_report["selected_provider"] = self.run_context.selected_provider
+        
+        # Determine next step
+        if self.run_context.mode == "planning":
+            run_report["next_step"] = "Plan created. Ready to generate content."
+        elif self.fallback_used:
+            run_report["next_step"] = "Generated with fallback. Review output quality."
+        else:
+            run_report["next_step"] = "Generated with AI. Review and approve."
         
         self.report_builder.save_run_report(run_report)
         
-        # Build cost report
-        cost_report = self.report_builder.build_cost_report(self.cost_guard)
-        cost_report["fallback_info"] = {
-            "fallback_used": self.fallback_used
-        }
+        # Build cost report dengan aggregasi
+        cost_report = self._aggregate_cost_reports()
+        cost_report["fallback_used"] = self.fallback_used
+        
+        if self.fallback_used:
+            cost_report["warning"] = f"Fallback was used: {self.fallback_reason}"
+        
         self.report_builder.save_cost_report(cost_report)
         
         self.report_builder.save_artifact_list(output_files)
@@ -355,7 +378,8 @@ class EbookGenerator:
             "output/routing_decision.json",
             "output/review_report.json",
             "output/ebook_repaired.md",
-            "output/fallback_info.json"
+            "output/fallback_info.json",
+            "output/writer_cost_report.json"
         ]
         
         existing = [f for f in files if Path(f).exists()]
@@ -380,7 +404,7 @@ class EbookGenerator:
         # Planning phase (selalu)
         plan = self.run_planning_phase()
         
-        # Cek mode planning - jika ya, selesai di sini
+        # Cek mode planning
         if self.run_context.mode == "planning":
             logger.info("Mode is 'planning' - stopping after task plan")
             self.finalize()
@@ -481,8 +505,6 @@ def main():
         print(f"Artifacts: {len(result.get('artifacts', []))} files")
         print("=" * 50)
         
-        # Exit with appropriate code
-        # PARTIAL_SUCCESS juga dianggap success (exit 0)
         status = result.get('status', 'FAILED')
         if status in ['SUCCESS', 'PARTIAL_SUCCESS']:
             sys.exit(0)
