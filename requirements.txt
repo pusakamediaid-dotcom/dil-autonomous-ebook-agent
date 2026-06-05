@@ -1,0 +1,18 @@
+# DIL Autonomous Ebook Agent - Python Dependencies
+
+# Core dependencies
+# (MVP - minimal dependencies, no heavy ML libraries)
+
+# Testing & Validation
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+# Code quality
+black>=23.0.0
+flake8>=6.0.0
+
+# Type checking
+mypy>=1.0.0
+
+# JSON validation
+jsonschema>=4.0.0

@@ -1,0 +1,101 @@
+{
+  "schema_version": "1.0",
+  "description": "Agent role definitions for DIL Ebook Agent",
+  "roles": {
+    "memory_agent": {
+      "name": "Memory Agent",
+      "description": "Loads project documentation and context",
+      "inputs": [
+        "docs/PROJECT_BIBLE.md",
+        "docs/STYLE_GUIDE.md",
+        "docs/TERMINOLOGY_RULES.md",
+        "docs/SAFETY_RULES.md",
+        "memory/DECISION_LOG.md",
+        "memory/ERROR_HISTORY.md"
+      ],
+      "outputs": [
+        "output/memory_context.json"
+      ],
+      "dependencies": [],
+      "timeout_seconds": 60
+    },
+    "task_planner_agent": {
+      "name": "Task Planner Agent",
+      "description": "Plans and structures ebook generation tasks",
+      "inputs": [
+        "run_context"
+      ],
+      "outputs": [
+        "output/task_plan.json"
+      ],
+      "dependencies": [
+        "memory_agent"
+      ],
+      "timeout_seconds": 120
+    },
+    "router_agent": {
+      "name": "Router Agent",
+      "description": "Selects best available API provider",
+      "inputs": [
+        "config/model_pool.json",
+        "task_plan.json"
+      ],
+      "outputs": [
+        "output/routing_decision.json"
+      ],
+      "dependencies": [
+        "task_planner_agent"
+      ],
+      "timeout_seconds": 60
+    },
+    "outline_agent": {
+      "name": "Outline Agent",
+      "description": "Generates detailed ebook outlines",
+      "inputs": [
+        "output/task_plan.json"
+      ],
+      "outputs": [
+        "output/outline.json"
+      ],
+      "dependencies": [
+        "router_agent"
+      ],
+      "timeout_seconds": 180
+    },
+    "writer_agent": {
+      "name": "Writer Agent",
+      "description": "Writes ebook content based on outline",
+      "inputs": [
+        "output/outline.json",
+        "output/memory_context.json"
+      ],
+      "outputs": [
+        "output/ebook.md"
+      ],
+      "dependencies": [
+        "outline_agent"
+      ],
+      "timeout_seconds": 300
+    }
+  },
+  "execution_order": [
+    "memory_agent",
+    "task_planner_agent",
+    "router_agent",
+    "outline_agent",
+    "writer_agent"
+  ],
+  "conditional_execution": {
+    "planning_mode": {
+      "stops_after": "task_planner_agent",
+      "skip": ["router_agent", "outline_agent", "writer_agent"]
+    },
+    "test_mode": {
+      "limit_chapters": 1,
+      "limit_subsections": 2
+    },
+    "production_mode": {
+      "full_execution": true
+    }
+  }
+}

@@ -1,0 +1,132 @@
+name: Generate Ebook
+description: Create a new technical ebook using the DIL Ebook Agent
+title: "[EBOOK] "
+labels: ["generate-ebook"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📚 Ebook Generation Request
+        
+        Selamat! Anda telah sampai di formulir generasi ebook otomatis.
+        Isi form di bawah ini untuk memulai proses pembuatan ebook.
+        
+        > **Note:** Label `generate-ebook` atau `agent-run` akan memicu GitHub Actions.
+        > Gunakan mode `test` untuk percobaan, `production` untuk hasil final.
+
+  - type: input
+    id: ebook_title
+    attributes:
+      label: Judul Ebook
+      description: Judul buku elektronik yang ingin dibuat
+      placeholder: "Contoh: Pengenalan Machine Learning untuk Pemula"
+    validations:
+      required: true
+
+  - type: input
+    id: target_audience
+    attributes:
+      label: Target Pembaca
+      description: Siapa target pembaca ebook ini?
+      placeholder: "Contoh: Developer Python tingkat menengah"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reading_level
+    attributes:
+      label: Level Pembaca
+      description: Tingkat kesulitan konten
+      options:
+        - beginner
+        - intermediate
+        - advanced
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode Produksi
+      description: Mode eksekusi generasi
+      options:
+        - test
+        - planning
+        - production
+    validations:
+      required: true
+
+  - type: number
+    id: total_chapters
+    attributes:
+      label: Jumlah Bab
+      description: Berapa bab yang diinginkan (test mode: 1 bab saja)
+      placeholder: "1-20"
+      min: 1
+      max: 50
+    validations:
+      required: true
+
+  - type: textarea
+    id: content_brief
+    attributes:
+      label: Brief Konten
+      description: Ringkasan singkat isi ebook yang diinginkan
+      placeholder: |
+        Jelaskan topik utama, scope, dan fokus ebook.
+        
+        Contoh:
+        Ebook ini mencakup dasar-dasar machine learning:
+        - Konsep supervised vs unsupervised learning
+        - Algoritma regresi dan klasifikasi
+        - Praktik kode dengan Python dan scikit-learn
+    validations:
+      required: true
+
+  - type: dropdown
+    id: api_preference
+    attributes:
+      label: Preferensi API Provider
+      description: Provider AI yang disukai (kosongkan untuk auto-select)
+      options:
+        - auto
+        - provider_1
+        - provider_2
+        - provider_3
+        - provider_4
+        - provider_5
+    validations:
+      required: false
+
+  - type: confirm
+    id: pdf_required
+    attributes:
+      label: Apakah PDF diperlukan?
+      description: Jika ya, output akan mencakup konversi ke PDF (belum tersedia di MVP)
+      value: false
+
+  - type: confirm
+    id: approval_given
+    attributes:
+      label: Approval untuk eksekusi
+      description: Centang untuk mengkonfirmasi persetujuan generasi
+      value: false
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+
+        ## ✅ Checklist Sebelum Submit
+
+        - [ ] Judul ebook sudah jelas dan spesifik
+        - [ ] Target pembaca sudah teridentifikasi
+        - [ ] Level pembaca sesuai dengan konten
+        - [ ] Brief konten cukup detail
+        - [ ] Mode yang dipilih sudah tepat
+        - [ ] Approval sudah diberikan
+
+        > ⚠️ **Peringatan:** Eksekusi akan menggunakan API credits.
+        > Pastikan budget tersedia di GitHub Secrets.

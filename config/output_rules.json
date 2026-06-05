@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "description": "Output rules and formatting for DIL Ebook Agent",
+  "output_directory": "output",
+  "artifacts": [
+    {
+      "name": "ebook.md",
+      "type": "markdown",
+      "required": true,
+      "description": "Main ebook content in markdown format"
+    },
+    {
+      "name": "task_plan.json",
+      "type": "json",
+      "required": true,
+      "description": "Task plan with chapter structure"
+    },
+    {
+      "name": "outline.json",
+      "type": "json",
+      "required": true,
+      "description": "Detailed outline with sections and subsections"
+    },
+    {
+      "name": "run_report.json",
+      "type": "json",
+      "required": true,
+      "description": "Execution report with status and metrics"
+    },
+    {
+      "name": "cost_report.json",
+      "type": "json",
+      "required": true,
+      "description": "Cost breakdown and token usage"
+    },
+    {
+      "name": "memory_context.json",
+      "type": "json",
+      "required": false,
+      "description": "Context loaded from documentation"
+    },
+    {
+      "name": "routing_decision.json",
+      "type": "json",
+      "required": false,
+      "description": "API provider selection decision"
+    },
+    {
+      "name": "run_context.json",
+      "type": "json",
+      "required": false,
+      "description": "Complete run context snapshot"
+    },
+    {
+      "name": "error_log.txt",
+      "type": "text",
+      "required": false,
+      "description": "Error log for debugging"
+    }
+  ],
+  "markdown_rules": {
+    "heading_levels": {
+      "ebook_title": 1,
+      "chapter": 2,
+      "section": 3,
+      "subsection": 4
+    },
+    "required_sections": [
+      "[KONSEP]",
+      "[ANALOGI]",
+      "[CONTOH]",
+      "[APLIKASI]"
+    ],
+    "optional_sections": [
+      "[RUMUS]"
+    ],
+    "encoding": "utf-8",
+    "line_ending": "unix"
+  },
+  "naming_conventions": {
+    "chapters": "Chapter {number}: {title}",
+    "sections": "{number}. {title}",
+    "subsections": "{number}. {title}"
+  }
+}

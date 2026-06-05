@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "description": "Cost limits configuration for DIL Ebook Agent MVP",
+  "limits": {
+    "max_tokens_per_run": 100000,
+    "max_cost_per_run": 0.50,
+    "max_requests_per_agent": 20,
+    "max_chapters_per_run": 10
+  },
+  "thresholds": {
+    "warning_cost_percent": 50,
+    "warning_tokens_percent": 50,
+    "critical_cost_percent": 80,
+    "critical_tokens_percent": 80
+  },
+  "modes": {
+    "test": {
+      "max_tokens": 5000,
+      "max_cost": 0.05,
+      "max_chapters": 1
+    },
+    "planning": {
+      "max_tokens": 10000,
+      "max_cost": 0.10,
+      "max_chapters": 5
+    },
+    "production": {
+      "max_tokens": 100000,
+      "max_cost": 0.50,
+      "max_chapters": 10
+    }
+  },
+  "agent_limits": {
+    "memory_agent": {
+      "max_tokens": 5000,
+      "cost_per_1k": 0.0005
+    },
+    "task_planner_agent": {
+      "max_tokens": 10000,
+      "cost_per_1k": 0.001
+    },
+    "router_agent": {
+      "max_tokens": 2000,
+      "cost_per_1k": 0.0002
+    },
+    "outline_agent": {
+      "max_tokens": 15000,
+      "cost_per_1k": 0.0015
+    },
+    "writer_agent": {
+      "max_tokens": 50000,
+      "cost_per_1k": 0.005
+    }
+  }
+}
