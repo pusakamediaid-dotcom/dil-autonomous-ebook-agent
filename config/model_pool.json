@@ -7,5 +7,4 @@
       "provider_id": "provider_1",
       "provider_name": "OpenAI GPT",
       "env_secret_name": "PROVIDER_1_API_KEY",
-      "base_url": "",
-      "sdk_type": "openai",
+     
