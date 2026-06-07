@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="DIL Autonomous Ebook Agent — sistem agent AI berbasis GitHub Actions untuk produksi ebook teknis, preview website, dan validasi otomatis.">
+<meta name="robots" content="index, follow">
+<title>DIL Autonomous Ebook Agent</title>
+<style>
+:root { --navy:#0f172a; --soft-blue:#1e3a8a; --white:#fff; --light:#f8fafc; --accent:#f59e0b; --muted:#475569; --border:#e2e8f0; --ok:#166534; --warn:#92400e; --info:#1e40af; }
+* { box-sizing:border-box; }
+html, body { margin:0; padding:0; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:var(--navy); background:var(--light); line-height:1.6; -webkit-text-size-adjust:100%; }
+a { color:var(--soft-blue); }
+header { background: linear-gradient(180deg, var(--navy) 0%, var(--soft-blue) 100%); color:#fff; padding: 3rem 1rem 2.5rem; text-align:center; }
+header h1 { margin:0 0 .5rem; font-size:2rem; letter-spacing:.2px; }
+header p { margin:.5rem auto 1.2rem; opacity:.92; max-width: 640px; font-size:1.02rem; }
+.hero-buttons { display:flex; gap:.75rem; justify-content:center; flex-wrap:wrap; margin-top:1rem; }
+.btn { display:inline-block; padding:.7rem 1.2rem; border-radius:.5rem; text-decoration:none; font-weight:700; font-size:.98rem; }
+.btn-primary { background:var(--accent); color:var(--navy); }
+.btn-primary:hover { background:#d97706; }
+.btn-secondary { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.35); }
+.btn-secondary:hover { background:rgba(255,255,255,.22); }
+nav.topnav { background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; }
+nav.topnav ul { list-style:none; margin:0 auto; padding:.5rem 1rem; display:flex; gap:.5rem 1rem; flex-wrap:wrap; justify-content:center; max-width:960px; }
+nav.topnav a { text-decoration:none; color:var(--soft-blue); font-weight:600; font-size:.95rem; padding:.3rem .55rem; border-radius:.3rem; }
+nav.topnav a:hover { background:#f1f5f9; }
+main { max-width: 960px; margin:0 auto; padding: 1.8rem 1rem 2rem; }
+section { background:#fff; border:1px solid var(--border); border-radius:.75rem; padding: 1.4rem 1.25rem; margin-bottom: 1.2rem; }
+section h2 { margin:0 0 .8rem; color:var(--navy); font-size:1.25rem; }
+section h3 { color:var(--soft-blue); font-size:1.05rem; margin:1.1rem 0 .4rem; }
+ul, ol { margin:.4rem 0 .6rem 1.2rem; padding:0; }
+li { margin:.25rem 0; }
+.badge { display:inline-block; background:#f1f5f9; color:#334155; padding:.18rem .55rem; border-radius:999px; font-size:.82rem; font-weight:600; margin:.15rem .25rem .15rem 0; }
+.badge.ok { background:#dcfce7; color:var(--ok); }
+.badge.warn { background:#fef3c7; color:var(--warn); }
+.badge.info { background:#dbeafe; color:var(--info); }
+.badge.muted { background:#e2e8f0; color:#475569; }
+.status-grid { display:grid; grid-template-columns: 1fr; gap:.5rem; margin:.5rem 0; }
+.status-row { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.55rem .75rem; background:#f8fafc; border:1px solid var(--border); border-radius:.5rem; font-size:.94rem; }
+.status-row span:first-child { color:var(--muted); }
+code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+pre { background:#0f172a; color:#e2e8f0; padding:1rem; border-radius:.5rem; overflow-x:auto; font-size:.88rem; line-height:1.5; }
+code { background:#f1f5f9; padding:.1rem .35rem; border-radius:.25rem; font-size:.92em; color:#0f172a; }
+pre code { background:transparent; padding:0; color:inherit; }
+.note { background:#fef3c7; border:1px solid #fde68a; color:#78350f; padding:.8rem 1rem; border-radius:.5rem; margin:.6rem 0; font-size:.94rem; }
+.note.danger { background:#fee2e2; border-color:#fecaca; color:#7f1d1d; }
+.note.info { background:#dbeafe; border-color:#bfdbfe; color:#1e3a8a; }
+footer { text-align:center; padding: 1.6rem 1rem; color:var(--muted); font-size:.88rem; border-top:1px solid var(--border); background:#fff; }
+footer a { color:var(--soft-blue); text-decoration:none; }
+footer a:hover { text-decoration:underline; }
+@media (max-width: 640px) {
+  header h1 { font-size:1.55rem; }
+  header p { font-size:.96rem; }
+  section { padding:1.1rem; }
+  nav.topnav ul { gap:.25rem .6rem; }
+  .btn { width:100%; text-align:center; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>DIL Autonomous Ebook Agent</h1>
+  <p>Sistem agent AI berbasis GitHub Actions untuk produksi ebook teknis, preview website statis, dan validasi output otomatis.</p>
+  <div class="hero-buttons">
+    <a class="btn btn-primary" href="ebook.html">Buka Preview Ebook →</a>
+    <a class="btn btn-secondary" href="https://github.com/pusakamediaid-dotcom/dil-autonomous-ebook-agent" rel="noopener">Lihat Repository GitHub</a>
+  </div>
+</header>
+
+<nav class="topnav" aria-label="Navigasi utama">
+  <ul>
+    <li><a href="#tentang">Tentang</a></li>
+    <li><a href="#fungsi">Fungsi Agent</a></li>
+    <li><a href="#status">Status Sistem</a></li>
+    <li><a href="#cara-pakai">Cara Pakai</a></li>
+    <li><a href="#keamanan">Keamanan</a></li>
+    <li><a href="ebook.html">Preview Ebook</a></li>
+  </ul>
+</nav>
+
+<main>
+  <section id="tentang">
+    <h2>Tentang Proyek</h2>
+    <p><strong>DIL Autonomous Ebook Agent</strong> adalah kumpulan agent AI yang berjalan di GitHub Actions untuk membantu produksi ebook teknis berbahasa Indonesia. Agent ini menghasilkan draft Markdown, mengonversinya menjadi website statis, dan menyiapkan laporan validasi sebelum konten dipublikasikan.</p>
+    <p>Halaman ini adalah <strong>website publik resmi</strong> proyek, dipublikasikan melalui GitHub Pages dari branch <code>main</code> folder <code>/docs</code>.</p>
+    <p>
+      <span class="badge ok">Status Website: Online</span>
+      <span class="badge info">Source: main / docs</span>
+      <span class="badge muted">Versi: Awal Produksi</span>
+    </p>
+  </section>
+
+  <section id="fungsi">
+    <h2>Fungsi Agent</h2>
+    <p>Sistem terdiri dari beberapa agent yang bekerja berurutan:</p>
+    <ul>
+      <li><strong>Memory Agent</strong> — Mengingat konteks dan histori run.</li>
+      <li><strong>Task Planner</strong> — Membuat rencana tugas dan estimasi biaya.</li>
+      <li><strong>Router Agent</strong> — Memilih provider AI yang tersedia berdasarkan model_pool.</li>
+      <li><strong>Outline Agent</strong> — Membuat outline bab dan subbab.</li>
+      <li><strong>Writer Agent</strong> — Menulis konten dengan 5 lapisan: [KONSEP], [ANALOGI], [RUMUS], [CONTOH], [APLIKASI].</li>
+      <li><strong>Reviewer &amp; Repair Agent</strong> — Memvalidasi dan memperbaiki konten.</li>
+      <li><strong>Site Builder &amp; Validator</strong> — Mengubah Markdown menjadi HTML statis dan memeriksa kelayakannya.</li>
+    </ul>
+    <p>Hasil utama: <code>output/ebook.md</code> → website statis (<code>/docs/ebook.html</code>) + laporan validasi JSON.</p>
+  </section>
+
+  <section id="status">
+    <h2>Status Sistem</h2>
+    <div class="status-grid">
+      <div class="status-row"><span>Website default</span><span class="badge ok">Aktif</span></div>
+      <div class="status-row"><span>Preview Ebook (<code>/ebook.html</code>)</span><span class="badge ok">Tersedia</span></div>
+      <div class="status-row"><span>Custom domain <code>agent.pusakamedia.id</code></span><span class="badge warn">Menunggu DNS</span></div>
+      <div class="status-row"><span>Workflow validasi produksi</span><span class="badge ok">Aktif</span></div>
+      <div class="status-row"><span>Agent ebook produksi</span><span class="badge info">Siap dipakai (butuh API key)</span></div>
+      <div class="status-row"><span>Auto-posting</span><span class="badge muted">Dimatikan (sesuai kebijakan)</span></div>
+    </div>
+    <p class="note info">Domain khusus <code>agent.pusakamedia.id</code> baru aktif setelah record DNS CNAME diarahkan ke <code>pusakamediaid-dotcom.github.io</code>. Lihat <a href="CUSTOM_DOMAIN_SETUP.html">CUSTOM_DOMAIN_SETUP.md</a> di repository untuk panduan lengkap.</p>
+  </section>
+
+  <section id="cara-pakai">
+    <h2>Cara Menggunakan Agent</h2>
+    <h3>1. Jalankan Lewat GitHub Actions</h3>
+    <ol>
+      <li>Buka tab <strong>Actions</strong> pada repository.</li>
+      <li>Pilih workflow yang sesuai:
+        <ul>
+          <li><code>Test Export</code> — Validasi pipeline tanpa API key.</li>
+          <li><code>agent_run</code> — Produksi ebook (memerlukan API key di Secrets).</li>
+          <li><code>Production Website Check</code> — Memvalidasi folder <code>/docs</code>.</li>
+        </ul>
+      </li>
+      <li>Klik <strong>Run workflow</strong>.</li>
+      <li>Setelah selesai, unduh artifact yang dihasilkan.</li>
+    </ol>
+    <h3>2. Buat Issue Generate Ebook</h3>
+    <p>Gunakan template issue <code>[EBOOK] Judul Ebook</code> untuk memicu produksi ebook. Workflow akan memproses dan menempelkan laporan di issue.</p>
+    <h3>3. Lihat Preview</h3>
+    <p>Buka <a href="ebook.html">/ebook.html</a> untuk melihat contoh hasil render ebook.</p>
+  </section>
+
+  <section id="secrets">
+    <h2>API Key &amp; Secrets</h2>
+    <p>Agent membaca API key dari <strong>GitHub Actions Secrets</strong>. Tidak ada API key yang disimpan di kode atau file repository.</p>
+    <p><strong>Secret yang dipakai kode saat ini:</strong></p>
+    <ul>
+      <li><code>PROVIDER_1_API_KEY</code> — OpenAI (GPT-4o / GPT-4o-mini)</li>
+      <li><code>PROVIDER_2_API_KEY</code> — Gemini slot 1</li>
+      <li><code>PROVIDER_3_API_KEY</code> — Gemini slot 2</li>
+      <li><code>PROVIDER_4_API_KEY</code> — Gemini slot 3</li>
+      <li><code>PROVIDER_5_API_KEY</code> — OpenRouter</li>
+    </ul>
+    <p><strong>Tersedia untuk integrasi berikutnya</strong> (belum aktif di kode utama):</p>
+    <ul>
+      <li><code>HUGGINGFACE_API_KEY</code></li>
+      <li><code>TAVILY_API_KEY</code></li>
+      <li><code>PERSONAL_GITHUB_TOKEN</code> (jika dibutuhkan untuk operasi lintas-repo)</li>
+    </ul>
+    <p class="note">Catatan transparansi: nama secret seperti <code>GEMINI_API_KEY</code> atau <code>OPENROUTER_API_KEY</code> tidak dibaca langsung oleh kode. Pemetaannya melalui slot <code>PROVIDER_*_API_KEY</code> sesuai <code>config/model_pool.json</code>.</p>
+  </section>
+
+  <section id="keamanan">
+    <h2>Catatan Keamanan &amp; Kebijakan</h2>
+    <ul>
+      <li><strong>Jangan</strong> menaruh API key, token, password, atau data rahasia di file repository.</li>
+      <li><strong>Tidak ada</strong> auto-posting ke media sosial atau marketplace tanpa approval manusia.</li>
+      <li><strong>Tidak ada</strong> klaim "gratis tanpa limit" — semua API memiliki kuota dan biaya masing-masing.</li>
+      <li><strong>Tidak ada</strong> klaim penghasilan pasti — output agent adalah alat bantu, bukan mesin uang otomatis.</li>
+      <li><strong>Tidak ada</strong> sistem pembayaran yang dipasang di repository ini.</li>
+      <li>Semua publikasi memerlukan review dan approval manusia.</li>
+    </ul>
+    <p class="note danger">Jika Anda menemukan secret atau data rahasia tertulis di file mana pun di repository, segera laporkan ke pemilik repository dan rotasi (revoke) secret tersebut.</p>
+  </section>
+
+  <section id="link">
+    <h2>Link Penting</h2>
+    <ul>
+      <li>Website default: <a href="https://pusakamediaid-dotcom.github.io/dil-autonomous-ebook-agent/">pusakamediaid-dotcom.github.io/dil-autonomous-ebook-agent</a></li>
+      <li>Domain khusus (setelah DNS aktif): <a href="http://agent.pusakamedia.id/">agent.pusakamedia.id</a></li>
+      <li>Repository: <a href="https://github.com/pusakamediaid-dotcom/dil-autonomous-ebook-agent">github.com/pusakamediaid-dotcom/dil-autonomous-ebook-agent</a></li>
+      <li>Preview Ebook: <a href="ebook.html">/ebook.html</a></li>
+      <li>Actions: <a href="https://github.com/pusakamediaid-dotcom/dil-autonomous-ebook-agent/actions">GitHub Actions</a></li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  <p>© DIL / Pusaka Media — DIL Autonomous Ebook Agent · Halaman ini di-host oleh GitHub Pages dari <code>main</code> / <code>docs</code>.</p>
+</footer>
+</body>
+</html>

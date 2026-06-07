@@ -2,6 +2,28 @@
 
 Agent AI berbasis GitHub Actions untuk produksi ebook teknis premium dan penghasilan konten.
 
+## Production Website Status
+
+| Item | Nilai |
+|---|---|
+| Website default | <https://pusakamediaid-dotcom.github.io/dil-autonomous-ebook-agent/> |
+| Domain khusus | <http://agent.pusakamedia.id/> *(aktif setelah DNS dikonfigurasi)* |
+| Source GitHub Pages | `main` / `docs` |
+| Preview ebook | [`/ebook.html`](https://pusakamediaid-dotcom.github.io/dil-autonomous-ebook-agent/ebook.html) |
+| Validator produksi | `src/validators/production_website_validator.py` |
+| Workflow validasi | `.github/workflows/production_website_check.yml` |
+| Panduan DNS | [`docs/CUSTOM_DOMAIN_SETUP.md`](docs/CUSTOM_DOMAIN_SETUP.md) |
+| Laporan perbaikan terbaru | [`docs/PRODUCTION_FIX_REPORT.md`](docs/PRODUCTION_FIX_REPORT.md) |
+
+**Catatan:** Domain khusus `agent.pusakamedia.id` memerlukan DNS CNAME
+`agent` → `pusakamediaid-dotcom.github.io` yang harus diatur oleh DIL pada
+panel DNS domain `pusakamedia.id`. Tanpa langkah ini, GitHub Pages akan
+menampilkan 404 untuk domain custom. Lihat
+[`docs/CUSTOM_DOMAIN_SETUP.md`](docs/CUSTOM_DOMAIN_SETUP.md).
+
+---
+
+
 ## Deskripsi
 
 DIL Autonomous Content & Income Agent adalah sistem yang terdiri dari 3 kelompok agent:

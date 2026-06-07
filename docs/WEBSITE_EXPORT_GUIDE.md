@@ -4,6 +4,60 @@ Dokumentasi ini menjelaskan fitur Website Export Layer pada DIL Autonomous Ebook
 
 ---
 
+## 0. Jalur Produksi Stabil (UPDATE)
+
+Saat ini ada **dua folder website** dengan peran berbeda:
+
+| Folder | Peran | Sumber |
+|---|---|---|
+| `/site` | **Output generator / staging** | Dihasilkan oleh `src/exporters/site_builder.py` dari `output/ebook.md` (atau `samples/ebook.md` sebagai fallback). |
+| `/docs` | **Website publik produksi (stabil)** | Sumber resmi yang dibaca GitHub Pages. |
+
+**GitHub Pages aktif membaca `/docs`** dengan konfigurasi:
+
+- Source: **Deploy from a branch**
+- Branch: **`main`**
+- Folder: **`/docs`**
+- Custom domain: **`agent.pusakamedia.id`** (via `docs/CNAME`)
+
+### Cara Menyalin Hasil Terbaru dari `/site` ke `/docs`
+
+Setelah `site_builder.py` menghasilkan `site/ebook.html` baru:
+
+```bash
+# Dari root repository
+cp site/ebook.html docs/ebook.html
+# (Opsional) salin CSS / asset lain jika perlu:
+# cp site/style.css docs/style.css
+```
+
+> **Jangan menimpa `docs/index.html`** dengan hasil generator. `docs/index.html`
+> adalah landing page produksi yang dirancang khusus (dengan branding, status,
+> dan link). Hanya salin konten preview ebook (`ebook.html`).
+
+### Custom Domain `agent.pusakamedia.id`
+
+- File `docs/CNAME` sudah berisi `agent.pusakamedia.id`.
+- DNS harus diatur DIL: CNAME `agent` → `pusakamediaid-dotcom.github.io`.
+- Panduan lengkap: lihat [`CUSTOM_DOMAIN_SETUP.md`](CUSTOM_DOMAIN_SETUP.md).
+
+### Workflow Validasi Produksi
+
+- Validator: `src/validators/production_website_validator.py`
+- Workflow: `.github/workflows/production_website_check.yml`
+- Output: `output/production_website_validation_report.json`
+- Workflow ini **hanya memvalidasi** isi `/docs` — tidak melakukan deploy.
+  Deploy ditangani langsung oleh GitHub Pages dari branch `main` folder `/docs`.
+
+> Workflow lama `deploy_site.yml` (yang mem-publish folder `/site` lewat
+> `actions/deploy-pages`) **tidak lagi menjadi sumber kebenaran** untuk
+> website publik. Workflow tersebut dibiarkan untuk kompatibilitas, tetapi
+> tidak perlu dijalankan saat menggunakan jalur `/docs`. Jika ingin
+> menonaktifkan, hapus workflow_dispatch atau ganti `on:` menjadi nonaktif
+> — **jangan dihapus** file historisnya.
+
+---
+
 ## 1. Tujuan Website Export Layer
 
 Website Export Layer bertujuan mengubah output utama `output/ebook.md` menjadi tiga bentuk:

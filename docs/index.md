@@ -2,17 +2,19 @@
 
 Website statis resmi untuk preview proyek agent produksi ebook DIL.
 
+> Catatan: Halaman utama publik adalah `index.html` di folder ini. File `index.md` ini hanya fallback ringan.
+
 ## Status
 
-Static Website Export Ready.
-
-Halaman ini disiapkan untuk GitHub Pages melalui branch `main` dan folder `/docs`.
+Production website aktif via GitHub Pages — branch `main`, folder `/docs`.
 
 ## Preview Ebook
 
-Buka preview ebook:
+Buka preview ebook: [ebook.html](ebook.html)
 
-[Preview Ebook](../site/ebook.html)
+## Repository
+
+Lihat source code: <https://github.com/pusakamediaid-dotcom/dil-autonomous-ebook-agent>
 
 ## Fungsi
 

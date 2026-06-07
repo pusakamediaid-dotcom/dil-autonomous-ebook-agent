@@ -1,0 +1,54 @@
+name: Production Website Check
+
+# Validasi folder /docs sebagai sumber website publik produksi.
+# Workflow ini TIDAK melakukan deploy. Deploy ditangani oleh GitHub Pages
+# (Source: Deploy from a branch -> main -> /docs).
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "src/validators/production_website_validator.py"
+      - ".github/workflows/production_website_check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate-docs:
+    name: Validate /docs website
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run production website validator
+        run: |
+          python src/validators/production_website_validator.py
+
+      - name: Show report (if exists)
+        if: always()
+        run: |
+          if [ -f output/production_website_validation_report.json ]; then
+            echo "----- production_website_validation_report.json -----"
+            cat output/production_website_validation_report.json
+          else
+            echo "Report not found."
+          fi
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-website-validation-report
+          path: output/production_website_validation_report.json
+          if-no-files-found: warn
