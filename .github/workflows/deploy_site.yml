@@ -2,11 +2,15 @@ name: Deploy Site to GitHub Pages
 
 on:
   workflow_dispatch:
-  # Opsi: trigger setelah workflow ebook berhasil jika aman
-  # workflow_run:
-  #   workflows: ["DIL Ebook Agent Run"]
-  #   types:
-  #     - completed
+  push:
+    branches:
+      - main
+    paths:
+      - "site/**"
+      - "src/exporters/**"
+      - "src/validators/**"
+      - ".github/workflows/deploy_site.yml"
+      - "samples/**"
 
 permissions:
   contents: read
@@ -33,13 +37,11 @@ jobs:
 
       - name: Build Site
         run: |
-          cd src/exporters
-          python site_builder.py
+          python src/exporters/site_builder.py
 
       - name: Validate Site
         run: |
-          cd src/validators
-          python website_validator.py
+          python src/validators/website_validator.py
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
