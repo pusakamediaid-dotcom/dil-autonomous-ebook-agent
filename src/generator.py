@@ -31,6 +31,12 @@ from validators.markdown_validator import validate_markdown_file
 from validators.output_validator import validate_outputs
 from validators.safety_validator import check_file_safety
 
+# Website Export Layer integrations
+from exporters.site_builder import build_site
+from exporters.pdf_exporter import main as pdf_exporter_main
+from validators.website_validator import validate_website
+from validators.pdf_validator import validate_pdf
+
 logger = get_logger(__name__)
 
 
@@ -291,6 +297,67 @@ class EbookGenerator:
             self.run_context.mark_agent_failed("repair_agent")
             return {"status": "ERROR"}
     
+    def _run_export_phase(self) -> Dict[str, Any]:
+        """
+        Website Export Layer:
+        Build site, try PDF export, validate outputs.
+        Catat warning jika exporter gagal; jangan hentikan pipeline
+        kecuali website benar-benar tidak bisa dibuat.
+        """
+        logger.info("=== EXPORT PHASE ===")
+        export_status = {
+            "site_built": False,
+            "pdf_exported": False,
+            "pdf_fallback": False,
+            "website_validation": None,
+            "pdf_validation": None,
+            "warnings": []
+        }
+
+        # Build site
+        try:
+            build_site()
+            export_status["site_built"] = True
+            logger.info("Site built successfully")
+        except Exception as e:
+            logger.warning(f"Site builder failed: {e}")
+            export_status["warnings"].append(f"Site builder failed: {e}")
+
+        # PDF export (best-effort)
+        try:
+            pdf_exporter_main()
+            if Path("output/ebook.pdf").exists() and Path("output/ebook.pdf").stat().st_size > 1024:
+                export_status["pdf_exported"] = True
+                logger.info("PDF exported successfully")
+            elif Path("output/ebook_pdf_fallback.txt").exists():
+                export_status["pdf_fallback"] = True
+                logger.info("PDF fallback note created")
+            else:
+                export_status["warnings"].append("PDF export did not produce output or fallback")
+        except Exception as e:
+            logger.warning(f"PDF exporter failed: {e}")
+            export_status["warnings"].append(f"PDF exporter failed: {e}")
+
+        # Validate website
+        try:
+            web_report = validate_website()
+            export_status["website_validation"] = web_report
+            logger.info(f"Website validation: {web_report.get('status')}")
+        except Exception as e:
+            logger.warning(f"Website validator failed: {e}")
+            export_status["warnings"].append(f"Website validator failed: {e}")
+
+        # Validate PDF
+        try:
+            pdf_report = validate_pdf()
+            export_status["pdf_validation"] = pdf_report
+            logger.info(f"PDF validation: {pdf_report.get('status')}")
+        except Exception as e:
+            logger.warning(f"PDF validator failed: {e}")
+            export_status["warnings"].append(f"PDF validator failed: {e}")
+
+        return export_status
+
     def _aggregate_cost_reports(self) -> Dict[str, Any]:
         """Agregasi cost reports dari Writer Agent."""
         writer_cost_path = self.output_dir / "writer_cost_report.json"
@@ -379,7 +446,15 @@ class EbookGenerator:
             "output/review_report.json",
             "output/ebook_repaired.md",
             "output/fallback_info.json",
-            "output/writer_cost_report.json"
+            "output/writer_cost_report.json",
+            # Website Export Layer artifacts
+            "site/index.html",
+            "site/style.css",
+            "site/metadata.json",
+            "output/ebook.pdf",
+            "output/ebook_pdf_fallback.txt",
+            "output/website_validation_report.json",
+            "output/pdf_validation_report.json",
         ]
         
         existing = [f for f in files if Path(f).exists()]
@@ -452,6 +527,10 @@ class EbookGenerator:
             
             if repair_result.get("status") == "COMPLETED":
                 logger.info("Repair completed successfully")
+        
+        # Export Phase (Website Export Layer)
+        export_result = self._run_export_phase()
+        self.warnings.extend(export_result.get("warnings", []))
         
         # Finalize
         self.finalize()

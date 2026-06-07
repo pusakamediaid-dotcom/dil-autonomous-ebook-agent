@@ -291,6 +291,44 @@ python src/generator.py
 - Cek fallback_info.json jika fallback dipakai
 - Review review_report.json untuk validasi konten
 
+## Website Export Layer
+
+Repository sekarang mendukung pembuatan **preview website statis** dan **export PDF** (best-effort) dari ebook yang dihasilkan.
+
+### Cara Menjalankan Test Export (Tanpa API)
+
+Workflow `test_export.yml` dapat dijalankan secara manual untuk memvalidasi pipeline export tanpa memerlukan API key:
+
+1. Buka tab **Actions** di repository.
+2. Pilih workflow **Test Export**.
+3. Klik **Run workflow** → **Run workflow**.
+4. Tunggu hingga selesai dan unduh artifact.
+
+### Cara Menjalankan Deploy Website (GitHub Pages)
+
+Workflow `deploy_site.yml` membangun folder `site/` dan menerbitkannya ke GitHub Pages:
+
+1. Pastikan **GitHub Pages** diaktifkan di repository Settings (Source: GitHub Actions).
+2. Buka tab **Actions**.
+3. Pilih workflow **Deploy Site to GitHub Pages**.
+4. Klik **Run workflow** → **Run workflow**.
+5. Akses website di URL GitHub Pages repository.
+
+### Cara Melihat Artifact
+
+Setelah workflow berjalan, artifact tersedia di halaman run workflow. Artifact berisi:
+- `site/` — HTML, CSS, dan metadata preview.
+- `output/` — ebook.md, laporan validasi, dan fallback PDF jika ada.
+- `samples/` — contoh ebook dan preview statis.
+
+### Catatan Penting
+
+- **Produksi besar belum dibuka** sampai mode test lulus sepenuhnya.
+- **API memiliki kuota dan biaya**; tidak ada klaim gratis tanpa limit.
+- **PDF export bersifat best-effort**: jika `pandoc` tersedia, PDF akan dibuat otomatis. Jika tidak, tersedia file fallback dengan instruksi manual.
+- **Website validation** menghasilkan `output/website_validation_report.json`.
+- **PDF validation** menghasilkan `output/pdf_validation_report.json`.
+
 ## Batasan
 
 - Tidak ada klaim gratis tanpa limit

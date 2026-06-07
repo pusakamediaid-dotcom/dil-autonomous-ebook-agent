@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dasar Tegangan, Arus, dan Hambatan</title>
+<style>
+/* DIL Autonomous Ebook Agent - Site Styles */
+:root {
+  --navy: #0f172a;
+  --soft-blue: #1e3a8a;
+  --white: #fff;
+  --light: #f8fafc;
+  --accent: #f59e0b;
+  --text: #0f172a;
+  --muted: #475569;
+  --border: #e2e8f0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--light);
+  line-height: 1.7;
+}
+
+header {
+  background: linear-gradient(180deg, var(--navy) 0%, var(--soft-blue) 100%);
+  color: var(--white);
+  padding: 3rem 1rem 2.5rem;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.9rem;
+  letter-spacing: 0.2px;
+}
+
+header p {
+  margin: .5rem 0 0;
+  opacity: .9;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+nav {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: .5rem 1rem;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+nav a {
+  text-decoration: none;
+  color: var(--soft-blue);
+  font-weight: 600;
+  font-size: .95rem;
+  padding: .25rem .5rem;
+  border-radius: .25rem;
+}
+
+nav a:hover {
+  background: #f1f5f9;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+section h2 {
+  margin-top: 0;
+  color: var(--navy);
+  font-size: 1.25rem;
+}
+
+section h3 {
+  color: var(--soft-blue);
+  font-size: 1.05rem;
+  margin-top: 1.25rem;
+  margin-bottom: .5rem;
+}
+
+.badge {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #334155;
+  padding: .2rem .6rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 600;
+  margin-right: .4rem;
+  margin-bottom: .4rem;
+}
+
+.badge.ok { background: #dcfce7; color: #166534; }
+.badge.warn { background: #fef3c7; color: #92400e; }
+.badge.info { background: #dbeafe; color: #1e40af; }
+
+.cta {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--navy);
+  padding: .6rem 1rem;
+  border-radius: .5rem;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.cta:hover {
+  background: #d97706;
+}
+
+pre {
+  background: #f1f5f9;
+  padding: 1rem;
+  border-radius: .5rem;
+  overflow-x: auto;
+  font-size: .9rem;
+}
+
+footer {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #64748b;
+  font-size: .9rem;
+  border-top: 1px solid var(--border);
+}
+
+/* Utility for general markdown-based content */
+.content h1, .content h2, .content h3 {
+  color: var(--navy);
+  margin-top: 1.5em;
+  margin-bottom: .5em;
+}
+
+.content h1 { font-size: 1.8rem; }
+.content h2 { font-size: 1.5rem; }
+.content h3 { font-size: 1.25rem; }
+
+.content p {
+  margin: .6rem 0;
+}
+
+.content ul, .content ol {
+  padding-left: 1.25em;
+}
+
+.content code {
+  background: #f3f4f6;
+  padding: .15em .3em;
+  border-radius: .25em;
+  font-size: .95em;
+}
+
+.content pre {
+  background: #f3f4f6;
+  padding: 1em;
+  border-radius: .5em;
+  overflow-x: auto;
+}
+
+.content blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1em;
+  color: #4b5563;
+  margin-left: 0;
+}
+
+.content hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 2em 0;
+}
+
+.content a {
+  color: #0f766e;
+}
+
+@media (max-width: 640px) {
+  header h1 { font-size: 1.4rem; }
+  nav ul { gap: .5rem; }
+}
+
+</style>
+</head>
+<body>
+<main>
+<h1>Dasar Tegangan, Arus, dan Hambatan</h1>
+
+<p>&lt;strong&gt;Target Pembaca:&lt;/strong&gt; Pemula Elektronika</p>
+<p>&lt;strong&gt;Level:&lt;/strong&gt; Pemula</p>
+<p>&lt;strong&gt;Dibuat:&lt;/strong&gt; 2025-06-01</p>
+<hr>
+<h1>Daftar Isi</h1>
+
+<ol>
+<li>Bab 1 — Pengenaran Besaran Listrik</li>
+</ol>
+<p>1.1 Tegangan, Arus, dan Hambatan</p>
+<p>1.2 Hukum Ohm dan Prinsip Kerjanya</p>
+<hr>
+<h2>Bab 1 — Pengenaran Besaran Listrik</h2>
+
+<em>Memahami fondasi besaran listrik sebelum menyentuh komponen dan rangkaian.</em>
+
+<strong>Tujuan Pembelajaran:</strong>
+<ul>
+<li>Memahami definisi tegangan, arus, dan hambatan</li>
+<li>Mengenal satuan dan arah aliran arus</li>
+<li>Menghitung hubungan ketiga besaran dengan Hukum Ohm</li>
+</ul>
+<hr>
+<h3>1.1 Tegangan, Arus, dan Hambatan</h3>
+
+<h4>[KONSEP]</h4>
+
+<p>&lt;strong&gt;Tegangan, Arus, dan Hambatan&lt;/strong&gt; adalah konsep fundamental dalam dunia kelistrikan dan elektronika. Dalam konteks ebook &lt;em&gt;Dasar Tegangan, Arus, dan Hambatan&lt;/em&gt;, pemahaman ini menjadi fondasi bagi pemula elektronika untuk menganalisis, merancang, dan memelihara rangkaian listrik dengan aman. Brief yang diberikan menyoroti: Pengenaran besaran dasar listrik untuk pemula, termasuk satuan dan simbol, serta prinsip aliran muatan listrik dalam konduktor.</p>
+
+<p>Tegangan (&lt;em&gt;voltage&lt;/em&gt; atau beda potensial) adalah dorongan yang menyebabkan muatan bergerak dari satu titik ke titik lain. Satuan tegangan adalah &lt;strong&gt;volt (V)&lt;/strong&gt;. Arus (&lt;em&gt;current&lt;/em&gt;) adalah laju aliran muatan listrik melalui suatu penghantar. Satuan arus adalah &lt;strong&gt;ampere (A)&lt;/strong&gt;. Hambatan (&lt;em&gt;resistance&lt;/em&gt;) adalah penghambat aliran muatan yang timbul akibat sifat material dan geometri penghantar. Satuan hambatan adalah &lt;strong&gt;ohm (Ω)&lt;/strong&gt;. Tanpa memahami besaran-besaran ini secara terintegrasi, sulit untuk menyelesaikan masalah praktis di lapangan.</p>
+
+<h4>[ANALOGI]</h4>
+
+<p>Analogi yang paling tepat untuk memahami tegangan, arus, dan hambatan adalah sistem perpipaan air. Tegangan listrik analog dengan tekanan air dalam pipa: semakin tinggi tekanan, semakin besar dorongan untuk mengalirkan air. Arus listrik analog dengan laju aliran air: banyaknya air yang mengalir per satuan waktu. Hambatan listrik analog dengan hambatan pipa: pipa yang sempit atau kasus menyebabkan aliran air melambat. Daya listrik analog dengan daya hidrolik: tekanan kali laju aliran. Energi listrik analog dengan volume total air yang dipindahkan. Analogi ini membantu memvisualisasikan hubungan matematis yang abstrak menjadi gambaran nyata di kehidupan sehari-hari.</p>
+
+<h4>[RUMUS]</h4>
+
+<strong>Prinsip dan Rumus Utama:</strong>
+
+<ol>
+<li><strong>Hukum Ohm</strong>: Hubungan antara tegangan (V), arus (I), dan hambatan (R):</li>
+</ol>
+
+<p>V = I × R</p>
+
+<p>Artinya, tegangan yang diperlukan untuk mendorong arus tertentu sebanding dengan hambatan rangkaian. Jika hambatan naik dan arus tetap, tegangan harus naik.</p>
+
+<ol>
+<li><strong>Daya Listrik (P)</strong>: Daya adalah laju transfer energi, dihitung sebagai:</li>
+</ol>
+
+<p>P = V × I</p>
+
+<p>Dengan substitusi Hukum Ohm, daya juga dapat dinyatakan sebagai P = I² × R atau P = V² / R. Pemilihan rumus bergantung pada besaran yang diketahui dalam soal.</p>
+
+<ol>
+<li><strong>Energi Listrik (W)</strong>: Energi adalah daya dikalikan waktu:</li>
+</ol>
+
+<p>W = P × t</p>
+
+<p>Satuan energi dalam joule (J) atau kilowatt-jam (kWh) untuk aplikasi rumah tangga.</p>
+
+<h4>[CONTOH]</h4>
+
+<strong>Contoh Praktis:</strong>
+
+<p>Misalkan sebuah rangkaian sederhana memiliki tegangan sumber 12 V dan hambatan total 4 ohm. Dengan menggunakan Hukum Ohm, arus yang mengalir adalah 3 A. Daya yang diserap oleh rangkaian dapat dihitung sebagai 12 V × 3 A = 36 W. Jika rangkaian dihidupkan selama 5 detik, energi yang dikonversi adalah 36 W × 5 s = 180 J. Perhitungan sederhana ini menunjukkan hubungan langsung antara tegangan, arus, hambatan, daya, dan energi.</p>
+
+<p>Langkah-langkah penyelesaian masalah:</p>
+
+<ol>
+<li>Identifikasi besaran yang diketahui: tegangan, arus, hambatan, atau daya.</li>
+<li>Pilih rumus yang sesuai berdasarkan besaran yang dicari.</li>
+<li>Substitusikan nilai dengan satuan yang konsisten (V, A, ohm, W, s).</li>
+<li>Hitung dan verifikasi hasil dengan perbandingan orde magnitudo.</li>
+<li>Catat satuan akhir untuk menghindari kesalahan interpretasi.</li>
+</ol>
+
+<h4>[APLIKASI]</h4>
+
+<strong>Aplikasi Nyata:</strong>
+
+<ol>
+<li><strong>Perancangan Sumber Daya</strong>: Menentukan kapasitas trafo, catu daya, atau baterai yang diperlukan untuk beban tertentu.</li>
+<li><strong>Pemilihan Komponen</strong>: Memastikan resistor, kabel, dan perangkat semikonduktor memiliki rating daya dan arus yang memadai.</li>
+<li><strong>Efisiensi Energi</strong>: Menghitung rugi-rugi daya pada saluran transmisi sehingga dapat dioptimalkan dengan penaikan tegangan atau pengurangan hambatan.</li>
+<li><strong>Kesalahan Umum</strong>: Mengukur arus dengan multimeter dalam mode tegangan (akan merusak fuse), mengabaikan rugi panas pada resistor berdaya kecil, atau menyambung beban ke sumber tanpa memperhitungkan hambatan sumber.</li>
+</ol>
+
+<p>&lt;strong&gt;Catatan Keamanan:&lt;/strong&gt; Saat bekerja dengan rangkaian listrik, pastikan sumber tegangan dimatikan sebelum menyambung atau memodifikasi komponen. Gunakan multimeter yang tepat untuk mengukur tegangan dan arus sesuai rentang pengukuran. Jangan menyentuh konduktor bertegangan tanpa pelindung yang memadai. Kesalahan umum adalah mengabaikan rating daya komponen, yang dapat menyebabkan panas berlebih atau kerusakan permanen.</p>
+<hr>
+<h3>1.2 Hukum Ohm dan Prinsip Kerjanya</h3>
+
+<h4>[KONSEP]</h4>
+
+<p>&lt;strong&gt;Hukum Ohm dan Prinsip Kerjanya&lt;/strong&gt; merupakan konsep inti dalam ebook &lt;em&gt;Dasar Tegangan, Arus, dan Hambatan&lt;/em&gt;. Pembahasan ini dirancang agar pemula elektronika dapat memahami prinsip dasar, mengenali konteks penggunaan, dan menerapkan pengetahuan secara bertahap. Brief yang menjadi acuan: Pengenaran besaran dasar listrik untuk pemula, termasuk satuan dan simbol, serta prinsip aliran muatan listrik dalam konduktor. Pemahaman yang kokoh terhadap Hukum Ohm akan mempercepat pembelajaran bab-bab selanjutnya karena banyak subbab lain membangun fondasi dari konsep ini.</p>
+
+<p>Hukum Ohm menyatakan bahwa arus yang mengalir melalui penghantar sebanding lurus dengan tegangan yang diberikan, dan berbanding terbalik dengan hambatan penghantar, pada suhu tetap. Secara matematis: V = I × R. Hukum ini berlaku untuk konduktor ohmik, yaitu material yang hambatannya tidak bergantung pada tegangan atau arus yang mengalir. Namun, tidak semua komponen bersifat ohmik; dioda, transistor, dan lampu pijar memiliki karakteristik non-linear.</p>
+
+<h4>[ANALOGI]</h4>
+
+<p>Analogi yang relevan: bayangkan Hukum Ohm seperti fondasi bangunan. Fondasi yang kokoh memungkinkan struktur atas dibangun dengan aman dan stabil. Jika fondasi goyah, seluruh bangunan rentan terhadap beban. Dalam konteks &lt;em&gt;Dasar Tegangan, Arus, dan Hambatan&lt;/em&gt;, memahami Hukum Ohm dengan baik memastikan pembaca tidak keliru saat menemukan variasi atau pengecualian di bab-bab lanjutan.</p>
+
+<h4>[RUMUS]</h4>
+
+<strong>Prinsip Kerja dan Kerangka Berpikir:</strong>
+
+<ol>
+<li>Identifikasi variabel masukan yang relevan dengan Hukum Ohm: tegangan, arus, hambatan.</li>
+<li>Tentukan relasi atau pola antara variabel-variabel tersebut: V sebanding I, R berbanding terbalik I.</li>
+<li>Terapkan prinsip secara sistematis pada setiap studi kasus.</li>
+<li>Evaluasi hasil dengan membandingkan terhadap baseline atau referensi tepercaya.</li>
+</ol>
+
+<p>Pendekatan ini menjamin konsistensi dan mengurangi risiko kesalahan interpretasi.</p>
+
+<h4>[CONTOH]</h4>
+
+<strong>Contoh Praktis:</strong>
+
+<p>Misalkan sebuah proyek memerlukan penerapan Hukum Ohm dalam tiga tahap: persiapan, eksekusi, dan evaluasi. Pada tahap persiapan, kumpulkan semua komponen dan data yang diperlukan: nilai tegangan sumber, hambatan beban, dan batasan arus maksimum. Pada tahap eksekusi, jalankan langkah demi langkah sesuai urutan logika: hitung arus yang diharapkan, verifikasi dengan multimeter, dan catat hasil. Pada tahap evaluasi, bandingkan hasil dengan target awal dan catatkan penyimpangan. Setiap contoh di atas menekankan pada tindakan konkret, bukan deskripsi abstrak. Pembaca disarankan untuk mencoba meniru langkah-langkah tersebut pada proyek atau latihan pribadi.</p>
+
+<h4>[APLIKASI]</h4>
+
+<strong>Aplikasi Nyata:</strong>
+
+<ol>
+<li><strong>Pembelajaran</strong>: Gunakan Hukum Ohm sebagai fondasi untuk memahami materi tingkat lanjut seperti rangkaian seri-paralel dan analisis jaringan.</li>
+<li><strong>Pekerjaan</strong>: Terapkan dalam proyek nyata dengan mengadaptasi langkah sesuai konteks organisasi, misalnya perancangan catu daya untuk perangkat embedded.</li>
+<li><strong>Pengembangan Diri</strong>: Evaluasi hasil penerapan secara berkala untuk menemukan celah perbaikan, seperti memahami dampak suhu terhadap hambatan konduktor.</li>
+<li><strong>Kesalahan Umum</strong>: Mengabaikan konteks non-linear, menggunakan asumsi tanpa validasi, atau melompat ke solusi sebelum memahami masalah. Kesalahan lain adalah menganggap semua komponen bersifat ohmik, padahal banyak komponen elektronika memiliki karakteristik variabel.</li>
+</ol>
+
+<p>&lt;strong&gt;Catatan:&lt;/strong&gt; Terapkan Hukum Ohm dengan memperhatikan konteks dan batasan. Evaluasi risiko sebelum eksekusi. Jika ada keraguan, konsultasikan dengan referensi tepercaya atau gunakan simulator rangkaian seperti LTspice atau Proteus.</p>
+<hr>
+<h1>Ringkasan</h1>
+
+<p>Dalam ebook ini, kita telah membahas konsep-konsep penting dari &lt;strong&gt;Dasar Tegangan, Arus, dan Hambatan&lt;/strong&gt;. Dengan memahami setiap bab dan subbab, pembaca diharapkan dapat:</p>
+
+<ol>
+<li>Memahami fondasi teori secara mendalam dan komprehensif</li>
+<li>Menerapkan pengetahuan dalam praktik secara efektif dan efisien</li>
+<li>Mengembangkan kemampuan analitis untuk memecahkan masalah</li>
+<li>Mengaplikasikan dalam konteks nyata untuk hasil yang optimal</li>
+</ol>
+<hr>
+<strong>Catatan:</strong>
+<p>Ebook ini disusun untuk tujuan pembelajaran. Untuk informasi lebih lanjut, silakan konsultasikan dengan ahli di bidang terkait.</p>
+<hr>
+<em>Akhir dari dokumen</em>
+</main>
+</body>
+</html>

@@ -32,7 +32,11 @@ class OutputValidator:
         "routing_decision.json",
         "review_report.json",
         "ebook_repaired.md",
-        "error_log.txt"
+        "error_log.txt",
+        "website_validation_report.json",
+        "pdf_validation_report.json",
+        "ebook_pdf_fallback.txt",
+        "ebook.pdf"
     ]
     
     def __init__(self, output_dir: str = "output"):

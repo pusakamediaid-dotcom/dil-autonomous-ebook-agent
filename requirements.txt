@@ -16,3 +16,9 @@ mypy>=1.0.0
 
 # JSON validation
 jsonschema>=4.0.0
+
+# Optional: light Markdown parser (fallback converter built-in)
+# markdown>=3.0.0
+
+# Optional: WeasyPrint for PDF generation without pandoc
+# weasyprint>=60.0

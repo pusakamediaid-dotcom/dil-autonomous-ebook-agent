@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIL Autonomous Ebook Agent</title>
+<style>
+:root { --navy:#0f172a; --soft-blue:#1e3a8a; --white:#fff; --light:#f8fafc; --accent:#f59e0b; }
+* { box-sizing:border-box; }
+body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#0f172a; background:#f8fafc; line-height:1.6; }
+header { background: linear-gradient(180deg, #0f172a 0%, #1e3a8a 100%); color:#fff; padding: 3rem 1rem 2.5rem; text-align:center; }
+header h1 { margin:0; font-size:1.9rem; letter-spacing:0.2px; }
+header p { margin:.5rem 0 0; opacity:.9; max-width: 640px; margin-left:auto; margin-right:auto; }
+nav { background:#fff; border-bottom:1px solid #e2e8f0; position:sticky; top:0; z-index:10; }
+nav ul { list-style:none; margin:0; padding:.5rem 1rem; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center; max-width:960px; margin:0 auto; }
+nav a { text-decoration:none; color:#1e3a8a; font-weight:600; font-size:.95rem; padding:.25rem .5rem; border-radius:.25rem; }
+nav a:hover { background:#f1f5f9; }
+main { max-width: 960px; margin:0 auto; padding: 2rem 1rem; }
+section { background:#fff; border:1px solid #e2e8f0; border-radius:.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+section h2 { margin-top:0; color:#0f172a; font-size:1.25rem; }
+section h3 { color:#1e3a8a; font-size:1.05rem; margin-top:1.25rem; margin-bottom:.5rem; }
+.badge { display:inline-block; background:#f1f5f9; color:#334155; padding:.2rem .6rem; border-radius:999px; font-size:.85rem; font-weight:600; margin-right:.4rem; margin-bottom:.4rem; }
+.badge.ok { background:#dcfce7; color:#166534; }
+.badge.warn { background:#fef3c7; color:#92400e; }
+.badge.info { background:#dbeafe; color:#1e40af; }
+.cta { display:inline-block; background: #f59e0b; color:#0f172a; padding:.6rem 1rem; border-radius:.5rem; text-decoration:none; font-weight:700; }
+.cta:hover { background:#d97706; }
+pre { background:#f1f5f9; padding:1rem; border-radius:.5rem; overflow-x:auto; font-size:.9rem; }
+footer { text-align:center; padding: 2rem 1rem; color:#64748b; font-size:.9rem; border-top:1px solid #e2e8f0; }
+@media (max-width: 640px) { header h1 { font-size:1.4rem; } nav ul { gap:.5rem; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>DIL Autonomous Ebook Agent</h1>
+  <p>Agent produksi ebook teknis berbasis GitHub Actions yang menghasilkan Markdown, PDF, dan website statis untuk GitHub Pages.</p>
+</header>
+<nav>
+  <ul>
+    <li><a href="#fungsi">Fungsi</a></li>
+    <li><a href="#preview">Preview</a></li>
+    <li><a href="#artifact">Artifact</a></li>
+    <li><a href="#cara-jalankan">Cara Menjalankan</a></li>
+    <li><a href="#keamanan">Keamanan</a></li>
+    <li><a href="#status">Status</a></li>
+  </ul>
+</nav>
+<main>
+  <section id="fungsi">
+    <h2>Apa Fungsi Agent Ini?</h2>
+    <p>DIL Autonomous Ebook Agent adalah sistem agent yang mengorkestrasi workflow pembuatan ebook teknis premium:</p>
+    <ul>
+      <li><strong>Memory Agent</strong> — mengingat konteks dan histori.</li>
+      <li><strong>Task Planner</strong> — membuat rencana tugas dan estimasi biaya.</li>
+      <li><strong>Router Agent</strong> — memilih provider AI yang tersedia.</li>
+      <li><strong>Outline Agent</strong> — membuat outline bab dan subbab.</li>
+      <li><strong>Writer Agent</strong> — menulis konten dengan 5 lapisan wajib: [KONSEP], [ANALOGI], [RUMUS], [CONTOH], [APLIKASI].</li>
+      <li><strong>Reviewer &amp; Repair Agent</strong> — memvalidasi dan memperbaiki konten.</li>
+    </ul>
+    <p>Output utama berupa <strong>ebook.md</strong> yang kemudian diubah menjadi <strong>website statis</strong> dan <strong>PDF</strong> (best-effort).</p>
+  </section>
+
+  <section id="preview">
+    <h2>Preview Ebook</h2>
+    <p>Berikut adalah contoh hasil render dari ebook yang dihasilkan:</p>
+    <div style="border:1px solid #e2e8f0; border-radius:.5rem; padding:1rem; background:#fff; max-height: 320px; overflow:auto;">
+      <p><strong>Bab 1 — Pengenaran Besaran Listrik</strong></p>
+      <p><strong>1.1 Tegangan, Arus, dan Hambatan</strong></p>
+      <p>Tegangan (V) adalah dorongan beda potensial. Arus (A) adalah laju aliran muatan. Hambatan (Ω) adalah penghambat aliran muatan.</p>
+      <p><strong>1.2 Hukum Ohm</strong></p>
+      <p>V = I × R. Arus sebanding dengan tegangan dan berbanding terbalik dengan hambatan.</p>
+    </div>
+    <p style="margin-top:1rem;">Lihat <a href="ebook.html">ebook.html</a> untuk hasil build dari ebook terbaru, atau <a href="samples/ebook.md">samples/ebook.md</a> untuk contoh Markdown lengkap.</p>
+  </section>
+
+  <section id="artifact">
+    <h2>Output Artifact</h2>
+    <p>Setelah workflow berjalan, artifact yang dihasilkan antara lain:</p>
+    <ul>
+      <li><span class="badge ok">ebook.md</span> Konten utama ebook.</li>
+      <li><span class="badge ok">site/index.html</span> Website statis untuk preview.</li>
+      <li><span class="badge ok">site/style.css</span> Gaya website.</li>
+      <li><span class="badge info">ebook.pdf</span> PDF jika pandoc tersedia.</li>
+      <li><span class="badge warn">ebook_pdf_fallback.txt</span> Jika pandoc belum tersedia.</li>
+      <li><span class="badge ok">run_report.json</span> Laporan eksekusi.</li>
+      <li><span class="badge ok">cost_report.json</span> Laporan biaya.</li>
+      <li><span class="badge ok">website_validation_report.json</span> Validasi website.</li>
+      <li><span class="badge ok">pdf_validation_report.json</span> Validasi PDF.</li>
+    </ul>
+  </section>
+
+  <section id="cara-jalankan">
+    <h2>Cara Menjalankan via GitHub Actions</h2>
+    <h3>Mode Test (Tanpa API)</h3>
+    <p>Workflow <code>test_export.yml</code> dapat dijalankan secara manual untuk memverifikasi export website dan PDF fallback tanpa memerlukan API key.</p>
+    <ol>
+      <li>Buka tab <strong>Actions</strong> di repository.</li>
+      <li>Pilih workflow <strong>Test Export</strong>.</li>
+      <li>Klik <strong>Run workflow</strong> → <strong>Run workflow</strong>.</li>
+      <li>Tunggu hingga selesai dan unduh artifact.</li>
+    </ol>
+    <h3>Mode Produksi</h3>
+    <p>Workflow <code>agent_run.yml</code> memerlukan GitHub Secrets berupa API key. Pastikan secret sudah dikonfigurasi sebelum menjalankan.</p>
+    <h3>Deploy Website</h3>
+    <p>Workflow <code>deploy_site.yml</code> dapat dijalankan manual untuk membangun dan menerbitkan <code>site/</code> ke GitHub Pages.</p>
+    <ol>
+      <li>Aktifkan GitHub Pages di repository Settings (source: GitHub Actions).</li>
+      <li>Jalankan workflow <strong>Deploy Site</strong> dari tab Actions.</li>
+      <li>Akses website di URL GitHub Pages repository.</li>
+    </ol>
+  </section>
+
+  <section id="keamanan">
+    <h2>Catatan Keamanan</h2>
+    <ul>
+      <li><strong>Jangan</strong> menaruh API key, token, atau secret di file repository mana pun.</li>
+      <li><strong>Jangan</strong> mengaktifkan auto-posting tanpa approval.</li>
+      <li><strong>Jangan</strong> membuat klaim penghasilan pasti atau gratis tanpa limit.</li>
+      <li>Semua API memiliki kuota dan biaya masing-masing.</li>
+      <li>Fallback writer tersedia jika API tidak tersedia.</li>
+    </ul>
+  </section>
+
+  <section id="status">
+    <h2>Status: Test Mode First</h2>
+    <p>Repository saat ini beroperasi dalam <strong>mode test</strong> untuk memvalidasi pipeline export website dan PDF. Mode produksi penuh akan dibuka setelah:</p>
+    <ul>
+      <li><span class="badge ok">test_export.yml</span> berhasil.</li>
+      <li><span class="badge ok">website_validation_report.json</span> status PASS.</li>
+      <li><span class="badge ok">PDF</span> ada atau fallback note tersedia.</li>
+      <li><span class="badge ok">GitHub Pages</span> berhasil menampilkan site.</li>
+      <li><span class="badge ok">README</span> sudah menjelaskan cara pakai.</li>
+    </ul>
+    <p>Silakan jalankan <a class="cta" href="https://github.com/pusakamediaid-dotcom/dil-autonomous-ebook-agent/actions">workflow di Actions</a> untuk memulai.</p>
+  </section>
+</main>
+<footer>
+  <p>© DIL / Pusaka Media — DIL Autonomous Ebook Agent</p>
+</footer>
+</body>
+</html>
